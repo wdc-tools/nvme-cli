@@ -2,12 +2,12 @@
 .\"     Title: nvme-smart-log
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 02/26/2016
+.\"      Date: 06/10/2016
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-SMART\-LOG" "1" "02/26/2016" "NVMe" "NVMe Manual"
+.TH "NVME\-SMART\-LOG" "1" "06/10/2016" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -34,6 +34,7 @@ nvme-smart-log \- Send NVMe SMART log page request, returns result and log
 .nf
 \fInvme smart\-log\fR <device> [\-\-namespace\-id=<nsid> | \-n <nsid>]
                         [\-\-raw\-binary | \-b]
+                        [\-\-output\-format=<fmt> | \-o <fmt>]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -41,7 +42,7 @@ Retrieves the NVMe SMART log page from an NVMe device and provides the retuned s
 .sp
 The <device> parameter is mandatory and may be either the NVMe character device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1)\&.
 .sp
-On success, the returned f/w log structure may be returned in one of several ways depending on the option flags; the structure may parsed by the program and printed in a readable format or the raw buffer may be printed to stdout for another program to parse\&.
+On success, the returned smart log structure may be returned in one of several ways depending on the option flags; the structure may parsed by the program and printed in a readable format or the raw buffer may be printed to stdout for another program to parse\&.
 .SH "OPTIONS"
 .PP
 \-n <nsid>, \-\-namespace\-id=<nsid>
@@ -90,7 +91,7 @@ Print the raw SMART log to a file:
 .RS 4
 .\}
 .nf
-# nvme smart\-log /dev/nvme0 \-\-raw\-binary > fw_log\&.raw
+# nvme smart\-log /dev/nvme0 \-\-raw\-binary > smart_log\&.raw
 .fi
 .if n \{\
 .RE

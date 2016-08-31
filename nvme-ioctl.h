@@ -1,8 +1,10 @@
 #ifndef _NVME_LIB_H
 #define _NVME_LIB_H
 
+#include <linux/types.h>
 #include <stdbool.h>
-#include "linux/nvme.h"
+#include "linux/nvme_ioctl.h"
+#include "nvme.h"
 
 int nvme_get_nsid(int fd);
 
@@ -76,14 +78,14 @@ int nvme_identify_ns(int fd, __u32 nsid, bool present, void *data);
 int nvme_identify_ns_list(int fd, __u32 nsid, bool all, void *data);
 int nvme_identify_ctrl_list(int fd, __u32 nsid, __u16 cntid, void *data);
 
-int nvme_get_log(int fd, __u32 nsid, __u32 cdw10, __u32 data_len, void *data);
-int nvme_log(int fd, __u32 nsid, __u8 log_id, __u32 data_len, void *data);
+int nvme_get_log(int fd, __u32 nsid, __u8 log_id, __u32 data_len, void *data);
 int nvme_fw_log(int fd, struct nvme_firmware_log_page *fw_log);
 int nvme_error_log(int fd, __u32 nsid, int entries,
 		   struct nvme_error_log_page *err_log);
 int nvme_smart_log(int fd, __u32 nsid, struct nvme_smart_log *smart_log);
 int nvme_intel_smart_log(int fd, __u32 nsid,
 			 struct nvme_additional_smart_log *intel_smart_log);
+int nvme_discovery_log(int fd, struct nvmf_disc_rsp_page_hdr *log, __u32 size);
 
 int nvme_feature(int fd, __u8 opcode, __u32 nsid, __u32 cdw10,
 		 __u32 cdw11, __u32 data_len, void *data, __u32 *result);
@@ -111,5 +113,8 @@ int nvme_sec_send(int fd, __u32 nsid, __u8 nssf, __u16 spsp,
 		  __u8 secp, __u32 tl, __u32 data_len, void *data, __u32 *result);
 int nvme_sec_recv(int fd, __u32 nsid, __u8 nssf, __u16 spsp,
 		  __u8 secp, __u32 al, __u32 data_len, void *data, __u32 *result);
+
+int nvme_subsystem_reset(int fd);
+int nvme_reset_controller(int fd);
 
 #endif				/* _NVME_LIB_H */

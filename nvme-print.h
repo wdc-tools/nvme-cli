@@ -1,7 +1,7 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef NVME_PRINT_H
+#define NVME_PRINT_H
 
-#include "linux/nvme.h"
+#include "nvme.h"
 
 enum {
 	TERSE = 0x1u,	// only show a few useful fields
@@ -13,6 +13,9 @@ enum {
 void d(unsigned char *buf, int len, int width, int group);
 void d_raw(unsigned char *buf, unsigned len);
 
+unsigned long int48_to_long(__u8 *data);
+
+void __show_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode, void (*vendor_show)(__u8 *vs));
 void show_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode);
 void show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int flags);
 void show_nvme_resv_report(struct nvme_reservation_status *status);
@@ -26,5 +29,21 @@ void nvme_feature_show_fields(__u32 fid, unsigned int result, unsigned char *buf
 char *nvme_status_to_string(__u32 status);
 char *nvme_select_to_string(int sel);
 char *nvme_feature_to_string(int feature);
+
+void json_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode);
+void json_nvme_id_ns(struct nvme_id_ns *ns, unsigned int flags);
+void json_nvme_resv_report(struct nvme_reservation_status *status);
+void json_error_log(struct nvme_error_log_page *err_log, int entries, const char *devname);
+void json_smart_log(struct nvme_smart_log *smart, unsigned int nsid, const char *devname);
+void json_fw_log(struct nvme_firmware_log_page *fw_log, const char *devname);
+
+void show_registers_version();
+void show_registers_cap();
+void show_registers_cc();
+void show_registers_csts();
+void show_registers_aqa();
+void show_registers_cmbloc();
+void show_registers_cmbsz();
+
 
 #endif

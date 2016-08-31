@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 8.6.7" />
+<meta name="generator" content="AsciiDoc 8.6.8" />
 <title>nvme-security-recv(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -87,10 +87,14 @@ ul, ol, li > p {
 ul > li     { color: #aaa; }
 ul > li > * { color: black; }
 
-pre {
+.monospaced, code, pre {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
   padding: 0;
   margin: 0;
 }
+
 
 #author {
   color: #527bbd;
@@ -415,12 +419,6 @@ div.unbreakable { page-break-inside: avoid; }
  *
  * */
 
-tt {
-  font-family: "Courier New", Courier, monospace;
-  font-size: inherit;
-  color: navy;
-}
-
 div.tableblock {
   margin-top: 1.0em;
   margin-bottom: 1.5em;
@@ -435,7 +433,7 @@ thead, p.table.header {
 p.table {
   margin-top: 0;
 }
-/* Because the table frame attribute is overridden by CSS in most browsers. */
+/* Because the table frame attribute is overriden by CSS in most browsers. */
 div.tableblock > table[frame="void"] {
   border-style: none;
 }
@@ -453,12 +451,6 @@ div.tableblock > table[frame="vsides"] {
  * html5 specific
  *
  * */
-
-.monospaced {
-  font-family: "Courier New", Courier, monospace;
-  font-size: inherit;
-  color: navy;
-}
 
 table.tableblock {
   margin-top: 1.0em;
@@ -539,6 +531,8 @@ body.manpage div.sectionbody {
 @media print {
   body.manpage div#toc { display: none; }
 }
+
+
 </style>
 <script type="text/javascript">
 /*<![CDATA[*/
@@ -755,7 +749,9 @@ nvme-security-recv(1) Manual Page
 <pre class="content"><em>nvme security-recv</em> [&lt;device&gt;] [--size=&lt;size&gt; | -x &lt;size&gt;]
                     [--secp=&lt;security-protocol&gt; | -p &lt;security-protocol&gt;]
                     [--spsp=&lt;protocol-specific&gt; | -s &lt;protocol-specific&gt;]
+                    [--nssf=&lt;nvme-specific&gt; | -N &lt;nvme-specific&gt;]
                     [--tl=&lt;transfer-length&gt; | -t &lt;transfer-length&gt;]
+                    [--namespace-id=&lt;nsid&gt; | -n &lt;nsid&gt;]
                     [-b | --raw-binary]</pre>
 <div class="attribution">
 </div></div>
@@ -782,6 +778,30 @@ controller reset occurs.</p></div>
 <h2 id="_options">OPTIONS</h2>
 <div class="sectionbody">
 <div class="dlist"><dl>
+<dt class="hdlist1">
+-n &lt;nsid&gt;
+</dt>
+<dt class="hdlist1">
+--namespace-id=&lt;nsid&gt;
+</dt>
+<dd>
+<p>
+        Target a specific namespace for this security command.
+</p>
+</dd>
+<dt class="hdlist1">
+-N &lt;nssf&gt;
+</dt>
+<dt class="hdlist1">
+--nssf=&lt;nssf&gt;
+</dt>
+<dd>
+<p>
+        NVMe Security Specific field. If using security protocol EAh
+        assigned for NVMe use, the NVMe security specific field indicates
+        which reply memory buffer target.
+</p>
+</dd>
 <dt class="hdlist1">
 -x &lt;size&gt;
 </dt>
@@ -862,7 +882,7 @@ controller reset occurs.</p></div>
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-02-09 08:30:40 MST
+Last updated 2016-05-14 12:27:05 EDT
 </div>
 </div>
 </body>

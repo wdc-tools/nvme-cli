@@ -9,7 +9,8 @@ SYNOPSIS
 --------
 [verse]
 'nvme id-ns' <device> [-v | --vendor-specific] [-b | --raw-binary]
-		    [--namespace-id=<nsid> | -n <nsid>]
+		    [--namespace-id=<nsid> | -n <nsid>] [-f | --force]
+		    [--output-format=<fmt> | -o <fmt>]
 
 DESCRIPTION
 -----------
@@ -35,6 +36,13 @@ OPTIONS
 	is required for the character devices, or overrides the block nsid
 	if given.
 
+-f::
+--force::
+	Request controller return the indentify namespace structure even
+	if the namespace is not attached to the controller. This is valid
+	only for controllers at or newer than revision 1.2. Controllers
+	at revision lower than this may interpret the command incorrectly.
+
 -b::
 --raw-binary::
 	Print the raw buffer to stdout. Structure is not parsed by
@@ -50,6 +58,12 @@ OPTIONS
 --human-readable::
 	This option will parse and format many of the bit fields
 	into human-readable formats.
+
+-o <format>::
+--output-format=<format>::
+              Set the reporting format to 'normal', 'json', or
+              'binary'. Only one output format can be used at a time.
+
 
 
 EXAMPLES

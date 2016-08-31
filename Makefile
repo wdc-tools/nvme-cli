@@ -1,10 +1,10 @@
 CFLAGS += -std=gnu99 -O2 -g -Wall -Werror
-CPPFLAGS += -I $(SRC) -D_GNU_SOURCE
+CPPFLAGS += -D_GNU_SOURCE
 NVME = nvme
 INSTALL ?= install
-SRC = ./src
 DESTDIR =
 PREFIX ?= /usr/local
+SYSCONFDIR = /etc
 SBINDIR = $(PREFIX)/sbin
 LIBUDEV := $(shell ld -o /dev/null -ludev >/dev/null 2>&1; echo $$?)
 LIB_DEPENDS =
@@ -30,20 +30,18 @@ override CFLAGS += -DNVME_VERSION='"$(NVME_VERSION)"'
 
 NVME_DPKG_VERSION=1~`lsb_release -sc`
 
-nvme: nvme.c ./linux/nvme.h argconfig.o suffix.o nvme-print.o nvme-ioctl.o NVME-VERSION-FILE
-	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c $(LDFLAGS) -o $(NVME) argconfig.o suffix.o nvme-print.o nvme-ioctl.o
+OBJS := argconfig.o suffix.o parser.o nvme-print.o nvme-ioctl.o \
+	nvme-lightnvm.o fabrics.o json.o plugin.o intel-nvme.o \
+	lnvm-nvme.o memblaze-nvme.o
 
-nvme-ioctl.o: nvme-ioctl.c nvme-ioctl.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c nvme-ioctl.c
+nvme: nvme.c nvme.h $(OBJS) NVME-VERSION-FILE
+	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c -o $(NVME) $(OBJS) $(LDFLAGS)
 
-argconfig.o: $(SRC)/argconfig.c $(SRC)/argconfig.h $(SRC)/suffix.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $(SRC)/argconfig.c
+nvme.o: nvme.c nvme.h nvme-print.h nvme-ioctl.h argconfig.h suffix.h nvme-lightnvm.h fabrics.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
 
-suffix.o: $(SRC)/suffix.c $(SRC)/suffix.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $(SRC)/suffix.c
-
-nvme-print.o: nvme-print.c nvme-print.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c nvme-print.c
+%.o: %.c %.h nvme.h linux/nvme_ioctl.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
 
 doc: $(NVME)
 	$(MAKE) -C Documentation
@@ -64,7 +62,11 @@ install-bin: default
 	$(INSTALL) -d $(DESTDIR)$(SBINDIR)
 	$(INSTALL) -m 755 nvme $(DESTDIR)$(SBINDIR)
 
-install: install-bin install-man
+install-bash-completion:
+	$(INSTALL) -d $(DESTDIR)$(SYSCONFDIR)/bash_completion.d
+	$(INSTALL) -m 644 -T ./completions/bash-nvme-completion.sh $(DESTDIR)$(SYSCONFDIR)/bash_completion.d/nvme
+
+install: install-bin install-man install-bash-completion
 
 nvme.spec: nvme.spec.in NVME-VERSION-FILE
 	sed -e 's/@@VERSION@@/$(NVME_VERSION)/g' < $< > $@+

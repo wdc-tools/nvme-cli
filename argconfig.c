@@ -64,6 +64,9 @@ void print_word_wrapped(const char *s, int indent, int start)
 	}
 
 	for (c = s; *c != 0; c++) {
+		if (*c == '\n')
+			goto new_line;
+
 		if (*c == ' ' || next_space < 0) {
 			next_space = 0;
 			for (t = c + 1; *t != 0 && *t != ' '; t++)
@@ -71,6 +74,7 @@ void print_word_wrapped(const char *s, int indent, int start)
 
 			if (((int)(c - s) + start + next_space) > (last_line - indent + width)) {
 				int i;
+new_line:
 				last_line = (int) (c-s) + start;
 				putc('\n', stderr);
 				for (i = 0; i < indent; i++)
@@ -138,7 +142,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 	char *endptr;
 	struct option *long_opts;
 	const struct argconfig_commandline_options *s;
-	int i, c, option_index = 0, short_index = 0, options_count = 0, non_opt_args = 0;
+	int c, option_index = 0, short_index = 0, options_count = 0;
 	void *value_addr;
 
 	errno = 0;
@@ -147,7 +151,6 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 
 	long_opts = malloc(sizeof(struct option) * (options_count + 2));
 	short_opts = malloc(sizeof(*short_opts) * (options_count * 3 + 4));
-	short_opts[short_index++] = '-';
 
 	for (s = options; (s->option != 0) && (option_index < options_count);
 	     s++) {
@@ -190,13 +193,8 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 	short_opts[short_index++] = 'h';
 	short_opts[short_index] = 0;
 
-	while ((c = getopt_long(argc, argv, short_opts, long_opts,
+	while ((c = getopt_long_only(argc, argv, short_opts, long_opts,
 				&option_index)) != -1) {
-		if (c == 1) {
-			argv[1 + non_opt_args] = optarg;
-			non_opt_args++;
-			continue;
-		}
 		if (c != 0) {
 			if (c == '?' || c == 'h') {
 				argconfig_print_help(program_desc, options);
@@ -210,7 +208,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 			if (option_index == options_count)
 				continue;
 			if (long_opts[option_index].flag) {
-				*(long_opts[option_index].flag) = 1;
+				*(uint8_t *)(long_opts[option_index].flag) = 1;
 				continue;
 			}
 		}
@@ -357,11 +355,6 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 	free(short_opts);
 	free(long_opts);
 
-	for (i = optind; i < argc; i++) {
-		argv[non_opt_args + 1] = argv[i];
-		non_opt_args++;
-	}
-
 	return 0;
  exit:
 	free(short_opts);
@@ -375,7 +368,7 @@ int argconfig_parse_subopt_string(char *string, char **options,
 	char **o = options;
 	char *tmp;
 
-	if (!strlen(string) || string == NULL) {
+	if (!string || !strlen(string)) {
 		*(o++) = NULL;
 		*(o++) = NULL;
 		return 0;
@@ -450,7 +443,7 @@ unsigned argconfig_parse_comma_sep_array(char *string, int *val,
 	char *tmp;
 	char *p;
 
-	if (!strlen(string) || string == NULL)
+	if (!string || !strlen(string))
 		return 0;
 
 	tmp = strtok(string, ",");
@@ -491,7 +484,7 @@ unsigned argconfig_parse_comma_sep_array_long(char *string,
 	char *tmp;
 	char *p;
 
-	if (!strlen(string) || string == NULL)
+	if (!string || !strlen(string))
 		return 0;
 
 	tmp = strtok(string, ",");
