@@ -130,7 +130,7 @@ static int hgst_purge_monitor(int argc, char **argv,
 	int rc;
 	__u8 output[HGST_NVME_PUEGE_MONITOR_DATA_LEN];
 	double progress_percent;
-	struct nvme_admin_cmd admin_cmd;
+	struct nvme_passthru_cmd admin_cmd;
 	struct hgst_nvme_purge_monitor_data *mon;
 	const struct argconfig_commandline_options command_line_options[] = {
 		{
