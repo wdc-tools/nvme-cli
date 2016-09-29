@@ -108,7 +108,7 @@ static int hgst_purge(int argc, char **argv,
 		switch (rc) {
 		case HGST_NVME_PURGE_CMD_SEQ_ERR:
 			err_str = "ERROR : Cannot execute purge, "
-					"Purge operation is in progresss.\n";
+					"Purge operation is in progress.\n";
 			break;
 		case HGST_NVME_PURGE_INT_DEV_ERR:
 			err_str = "ERROR : Internal Device Error.\n";
