@@ -58,3 +58,7 @@ EXAMPLES
 NVME
 ----
 Part of the nvme HGST Vendor Unique Command suite.
+
+TODO
+----
+Review all the description before final delivery.
