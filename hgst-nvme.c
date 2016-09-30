@@ -3,7 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 #include <linux/fs.h>
+#include <linux/limits.h>
 #include <inttypes.h>
 #include <asm/byteorder.h>
 
@@ -19,6 +22,11 @@
 #include <sys/ioctl.h>
 #define CREATE_CMD
 #include "hgst-nvme.h"
+
+/* Capture Diagnostics */
+#define HGST_NVME_CAP_DIAG_ERROR
+#define HGST_NVME_CAP_DIAG_INCOMPLETE
+#define HGST_NVME_CAP_DIAG_SUCCESS
 
 /* Purge and Purge Monitor constants */
 #define HGST_NVME_PURGE_CMD_OPCODE		0xDD
@@ -50,7 +58,88 @@ struct hgst_nvme_purge_monitor_data {
 	__u8  rsvd6[14];
 };
 
-static const char* hgst_nvme_status_to_string(__u32 status)
+#if 0
+static const char* hgst_nvme_cap_diag_status_to_string(__u32 status)
+{
+	char *ret;
+
+	switch (status) {
+		default:
+			ret = "Unknown.";
+	}
+
+	return ret;
+}
+#endif
+
+static int get_serial_name(int fd, char *file)
+{
+	int i;
+	int rc;
+	struct nvme_id_ctrl ctrl;
+
+	i = sizeof(ctrl.sn) - 1;
+	rc = nvme_identify_ctrl(fd, &ctrl);
+	if (rc) {
+		fprintf(stderr, "ERROR : HGST : nvme_identify_ctrl() failed\n");
+		return -1;
+	}
+	/* Remove trailing spaces from the name */
+	while (i && ctrl.sn[i] == ' ') {
+		ctrl.sn[i] = '\0';
+		i--;
+	}
+	sprintf(file, "%s.bin", ctrl.sn);
+	return 0;
+}
+
+static int hgst_cap_diag(int argc, char **argv,
+				struct command *command, struct plugin *plugin)
+{
+	char *desc = "Capture diagnostics log.";
+	char *file = "Output file pathname.";
+	char *err_str;
+	int fd;
+	int arch_fd;
+	int rc;
+    struct nvme_passthru_cmd admin_cmd;
+
+	struct config {
+		char file[PATH_MAX];
+	};
+
+	struct config cfg = {
+		.file = {0}
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"file",  'f', "FILE", CFG_STRING, &cfg.file, required_argument, file},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+		{0}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if ((strcmp(cfg.file, "") == 0) && (get_serial_name(fd, cfg.file) == -1)) {
+		fprintf(stderr, "ERROR : failed to generate file "
+				"pathname for cap-diag\n");
+		return -1;
+	}
+	if ((arch_fd = open(cfg.file, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0) {
+		fprintf(stderr, "ERROR : open : %s\n", strerror(errno));
+		return -1;
+	}
+    err_str = "";
+	memset(&admin_cmd, 0, sizeof(admin_cmd));
+	/* generate the archive log file here */
+	rc = 0;
+	close(arch_fd);
+	fprintf(stderr, "%s", err_str);
+	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(rc), rc);
+	return rc;
+}
+
+
+static const char* hgst_nvme_purge_mon_status_to_string(__u32 status)
 {
 	const char *str;
 
@@ -158,7 +247,7 @@ static int hgst_purge_monitor(int argc, char **argv,
 	if (rc == 0) {
 		mon = (struct hgst_nvme_purge_monitor_data *) output;
 		printf("Purge state = 0x%0x \n%s\n", admin_cmd.result,
-				hgst_nvme_status_to_string(admin_cmd.result));
+				hgst_nvme_purge_mon_status_to_string(admin_cmd.result));
 		if (admin_cmd.result == HGST_NVME_PURGE_STATE_BUSY) {
 			progress_percent = ((double)mon->entire_progress_current * 100) /
 				mon->entire_progress_total;
