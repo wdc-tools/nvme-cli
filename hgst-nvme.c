@@ -24,9 +24,9 @@
 #include "hgst-nvme.h"
 
 /* Capture Diagnostics */
-#define HGST_NVME_CAP_DIAG_ERROR
-#define HGST_NVME_CAP_DIAG_INCOMPLETE
-#define HGST_NVME_CAP_DIAG_SUCCESS
+#define HGST_CAP_DIAGS_HEADER_TOC_SIZE	0x100
+#define HGST_CAP_DIAGS_OPCODE			0xE6
+
 
 /* Purge and Purge Monitor constants */
 #define HGST_NVME_PURGE_CMD_OPCODE		0xDD
@@ -58,21 +58,8 @@ struct hgst_nvme_purge_monitor_data {
 	__u8  rsvd6[14];
 };
 
-#if 0
-static const char* hgst_nvme_cap_diag_status_to_string(__u32 status)
-{
-	char *ret;
 
-	switch (status) {
-		default:
-			ret = "Unknown.";
-	}
-
-	return ret;
-}
-#endif
-
-static int get_serial_name(int fd, char *file)
+static int hgst_get_serial_name(int fd, char *file)
 {
 	int i;
 	int rc;
@@ -93,16 +80,99 @@ static int get_serial_name(int fd, char *file)
 	return 0;
 }
 
+static __u32 get_total_length(int fd)
+{
+	__s32 rc;
+	__u32 total_length;
+	__u8 header_toc[HGST_CAP_DIAGS_HEADER_TOC_SIZE];
+	struct nvme_admin_cmd admin_cmd;
+
+	/* obtain main header and toc content */
+	memset(header_toc, 0, sizeof(header_toc));
+	memset(&admin_cmd, 0, sizeof(struct nvme_admin_cmd));
+	admin_cmd.opcode = HGST_CAP_DIAGS_OPCODE;
+	admin_cmd.addr = (__u64) header_toc;
+	admin_cmd.data_len = HGST_CAP_DIAGS_HEADER_TOC_SIZE;
+	/* NDT : how much bytes needs to be tranfered */
+	admin_cmd.cdw10 = HGST_CAP_DIAGS_HEADER_TOC_SIZE / 4;
+	/* offset = 0x00 : collect the data in snapshot image,
+					not available accross resets
+	*/
+	admin_cmd.cdw13 = 0x00;
+	rc = nvme_submit_passthru(fd,NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+	if (rc != 0) {
+		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(rc), rc);
+		return rc;
+	}
+	/* obtain full E6 log  */
+	total_length = header_toc[0x04] << 24 |
+	        	header_toc[0x05] << 16 |
+			header_toc[0x06] <<  8 |
+			header_toc[0x07];
+	return total_length;
+}
+
+
+static int get_diag_data(int fd, __u32 total_length, char *bin_filepath)
+{
+	int rc;
+	__u8 *diag_data;
+	FILE *bin_file;
+	struct nvme_admin_cmd admin_cmd;
+
+	if ((diag_data = malloc(total_length)) == NULL) {
+		fprintf(stderr, "ERROR : malloc : %s\n", strerror(errno));
+		return -1;
+	}
+
+	memset(diag_data, 0, total_length);
+	memset(&admin_cmd, 0, sizeof(struct nvme_admin_cmd));
+
+	admin_cmd.opcode = HGST_CAP_DIAGS_OPCODE;
+	admin_cmd.addr = (__u64) diag_data;
+	admin_cmd.data_len = total_length;
+	/* NDT : how much bytes needs to be tranfered */
+	admin_cmd.cdw10 = total_length / 4;
+	/* offset = 0x00 : collect the data in snapshot image,
+					not available accross resets
+	*/
+	admin_cmd.cdw13 = 0x00;
+
+	rc = nvme_submit_passthru(fd,NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+	if (rc != 0) {
+		fprintf(stderr, "ERROR : failed to execute e6"
+				" capture diagnostics command.\n");
+	} else {
+		if ((bin_file = fopen(bin_filepath, "wb+")) == NULL) {
+			rc = errno;	
+			fprintf(stderr, "ERROR : fopen : %s\n",
+				strerror(errno));
+		} else {
+			fwrite(&diag_data, sizeof(__u8), total_length,
+				bin_file);
+			if (ferror(bin_file)) {
+				rc = errno;	
+				fprintf (stderr, "ERROR : fwrite : %s\n",
+					strerror(errno));
+			}
+		}
+		fflush(bin_file);
+		fclose(bin_file);
+	}
+	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(rc), rc);
+	free(diag_data);
+
+	return rc;
+}
+
+
 static int hgst_cap_diag(int argc, char **argv,
 				struct command *command, struct plugin *plugin)
 {
 	char *desc = "Capture diagnostics log.";
 	char *file = "Output file pathname.";
-	char *err_str;
 	int fd;
-	int arch_fd;
-	int rc;
-    struct nvme_passthru_cmd admin_cmd;
+	__u32 total_length;
 
 	struct config {
 		char file[PATH_MAX];
@@ -118,24 +188,17 @@ static int hgst_cap_diag(int argc, char **argv,
 		{0}
 	};
 
+
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if ((strcmp(cfg.file, "") == 0) && (get_serial_name(fd, cfg.file) == -1)) {
+	if ((strcmp(cfg.file, "") == 0) &&
+			(hgst_get_serial_name(fd, cfg.file) == -1)) {
 		fprintf(stderr, "ERROR : failed to generate file "
-				"pathname for cap-diag\n");
+				"pathname for cap-diag.\n");
 		return -1;
 	}
-	if ((arch_fd = open(cfg.file, O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0) {
-		fprintf(stderr, "ERROR : open : %s\n", strerror(errno));
-		return -1;
-	}
-    err_str = "";
-	memset(&admin_cmd, 0, sizeof(admin_cmd));
-	/* generate the archive log file here */
-	rc = 0;
-	close(arch_fd);
-	fprintf(stderr, "%s", err_str);
-	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(rc), rc);
-	return rc;
+
+	total_length = get_total_length(fd);
+	return get_diag_data(fd, total_length, cfg.file);
 }
 
 
@@ -176,14 +239,7 @@ static int hgst_purge(int argc, char **argv,
 	int rc;
 	struct nvme_passthru_cmd admin_cmd;
 	const struct argconfig_commandline_options command_line_options[] = {
-		{   .option = NULL,
-			.short_option = '\0',
-			.meta = NULL,
-			.config_type = CFG_NONE,
-			.default_value = NULL,
-			.argument_type = no_argument,
-			.help = desc
-		},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
 		{0}
 	};
 
@@ -222,15 +278,7 @@ static int hgst_purge_monitor(int argc, char **argv,
 	struct nvme_passthru_cmd admin_cmd;
 	struct hgst_nvme_purge_monitor_data *mon;
 	const struct argconfig_commandline_options command_line_options[] = {
-		{
-			.option = NULL,
-			.short_option = '\0',
-			.meta = NULL,
-			.config_type = CFG_NONE,
-			.default_value = NULL,
-			.argument_type = no_argument,
-			.help = desc
-		},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
 		{0}
 	};
 
