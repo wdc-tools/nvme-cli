@@ -27,7 +27,6 @@
 #define HGST_CAP_DIAGS_HEADER_TOC_SIZE	0x100
 #define HGST_CAP_DIAGS_OPCODE			0xE6
 
-
 /* Purge and Purge Monitor constants */
 #define HGST_NVME_PURGE_CMD_OPCODE		0xDD
 #define HGST_NVME_PURGE_MONITOR_OPCODE		0xDE
@@ -80,7 +79,7 @@ static int hgst_get_serial_name(int fd, char *file)
 	return 0;
 }
 
-static __u32 get_total_length(int fd)
+static __u32 hgst_cap_diag_get_log_length(int fd)
 {
 	__s32 rc;
 	__u32 total_length;
@@ -104,16 +103,17 @@ static __u32 get_total_length(int fd)
 		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(rc), rc);
 		return rc;
 	}
-	/* obtain full E6 log  */
+	/* obtain total length of E6 log  */
 	total_length = header_toc[0x04] << 24 |
-	        	header_toc[0x05] << 16 |
-			header_toc[0x06] <<  8 |
-			header_toc[0x07];
+					header_toc[0x05] << 16 |
+					header_toc[0x06] <<  8 |
+					header_toc[0x07];
 	return total_length;
 }
 
 
-static int get_diag_data(int fd, __u32 total_length, char *bin_filepath)
+static int hgst_cap_diag_get_data(int fd, __u32 total_length,
+		char *bin_filepath)
 {
 	int rc;
 	__u8 *diag_data;
@@ -144,14 +144,14 @@ static int get_diag_data(int fd, __u32 total_length, char *bin_filepath)
 				" capture diagnostics command.\n");
 	} else {
 		if ((bin_file = fopen(bin_filepath, "wb+")) == NULL) {
-			rc = errno;	
+			rc = errno;
 			fprintf(stderr, "ERROR : fopen : %s\n",
 				strerror(errno));
 		} else {
 			fwrite(&diag_data, sizeof(__u8), total_length,
 				bin_file);
 			if (ferror(bin_file)) {
-				rc = errno;	
+				rc = errno;
 				fprintf (stderr, "ERROR : fwrite : %s\n",
 					strerror(errno));
 			}
@@ -197,8 +197,8 @@ static int hgst_cap_diag(int argc, char **argv,
 		return -1;
 	}
 
-	total_length = get_total_length(fd);
-	return get_diag_data(fd, total_length, cfg.file);
+	total_length = hgst_cap_diag_get_log_length(fd);
+	return hgst_cap_diag_get_data(fd, total_length, cfg.file);
 }
 
 
