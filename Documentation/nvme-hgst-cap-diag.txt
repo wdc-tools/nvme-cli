@@ -3,7 +3,7 @@ nvme-hgst-cap-diag(1)
 
 NAME
 ----
-nvme-hgst-cap-diag - Retrieve HGST device's diagnostic log and save to file. 
+nvme-hgst-cap-diag - Retrieve HGST device's diagnostic log and save to file.
 
 SYNOPSIS
 --------
@@ -13,41 +13,18 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-For the NVMe device given, sends the HGST Vendor Unique Capture-Diagnostics 
-request and saves the result to a compressed archive file. The NVMe device 
-must refer to a single physical device (namespaces are not supportedi).
-By default it will save the compressed arvhive in the current directory 
+For the NVMe device given, sends the HGST Vendor Unique Capture-Diagnostics
+request and saves the result to a compressed archive file. The NVMe device
+must refer to a single physical device (namespaces are not supported).
+By default it will save the compressed arvhive in the current directory
 of the program being executed. In absence of pathname it will create a file
 with Serial Number of the given NVMe deivce.
 
 This will only work on HGST devices supporting this feature.
 Results for any other device are undefined.
 
-Expected status and description :-
-
-[cols="2*", options="header"]
-|===
-|Status Code |Description
-
-|0x00
-|Purge State Idle.
-
-|0x01
-|Purge State Done.
-
-|0x02
-|Purge State Busy.
-
-|0x03
-|Purge State Error : Purge operation resulted in error, power cyale required.
-
-|0x04
-|Purge State Error : Purge operation interrupted by power cycle or reset.
-|===
-
-
 The <device> parameter is mandatory and may be either the NVMe character
-device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1).
+device (ex: /dev/nvme0).
 
 On success it returns 0, error code otherwise.
 
@@ -55,7 +32,7 @@ OPTIONS
 -------
 -f <FILE>::
 --file=<FILE>::
-	Output file; defaults to device name provided
+    Output file; defaults to device name provided
 
 
 EXAMPLES
@@ -66,9 +43,7 @@ EXAMPLES
 # nvme hgst cap-diag /dev/nvme0
 ------------
 
-EXAMPLES
---------
-* Has the program issue HGST Purge Vendor Unique Command with pathname:
+* Has the program issue HGST Capture-diagnostics Command with pathname:
 +
 ------------
 # nvme hgst cap-diag /dev/nvme0 -f /tmp/test
@@ -76,8 +51,4 @@ EXAMPLES
 
 NVME
 ----
-Part of the nvme HGST Vendor Unique Command suite.
-
-TODO
-----
-Review all the description before final delivery.
+Part of the nvme-user suite.
