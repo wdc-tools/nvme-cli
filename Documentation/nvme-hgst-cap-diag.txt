@@ -16,9 +16,9 @@ DESCRIPTION
 For the NVMe device given, sends the HGST Vendor Unique Capture-Diagnostics
 request and saves the result to a compressed archive file. The NVMe device
 must refer to a single physical device (namespaces are not supported).
-By default it will save the compressed arvhive in the current directory
+By default it will save the compressed archive in the current directory
 of the program being executed. In absence of pathname it will create a file
-with Serial Number of the given NVMe deivce.
+with Serial Number of the given NVMe device.
 
 This will only work on HGST devices supporting this feature.
 Results for any other device are undefined.
