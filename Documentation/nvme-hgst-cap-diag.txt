@@ -14,11 +14,11 @@ DESCRIPTION
 -----------
 
 For the NVMe device given, sends the HGST Vendor Unique Capture-Diagnostics
-request and saves the result to a compressed archive file. The NVMe device
+request and saves the result to an archive file. The NVMe device
 must refer to a single physical device (namespaces are not supported).
-By default it will save the compressed archive in the current directory
-of the program being executed. In absence of pathname it will create a file
-with Serial Number of the given NVMe device.
+By default it will save archive in the current directory of the program being
+executed. In absence of pathname it will create a file with Serial Number of
+the given NVMe device.
 
 This will only work on HGST devices supporting this feature.
 Results for any other device are undefined.
@@ -43,7 +43,7 @@ EXAMPLES
 # nvme hgst cap-diag /dev/nvme0
 ------------
 
-* Has the program issue HGST Capture-diagnostics Command with pathname:
+* Has the program issue HGST cap-diag Vendor Unique Command Command with pathname:
 +
 ------------
 # nvme hgst cap-diag /dev/nvme0 -f /tmp/test
