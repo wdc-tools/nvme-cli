@@ -23,8 +23,8 @@ with Serial Number of the given NVMe device.
 This will only work on HGST devices supporting this feature.
 Results for any other device are undefined.
 
-The <device> parameter is mandatory and may be either the NVMe character
-device (ex: /dev/nvme0).
+The <device> parameter is NVMe character device (ex: /dev/nvme0) and
+it is mandatory.
 
 On success it returns 0, error code otherwise.
 

@@ -148,7 +148,7 @@ static int hgst_cap_diag_get_data(int fd, __u32 total_length,
 			fprintf(stderr, "ERROR : fopen : %s\n",
 				strerror(errno));
 		} else {
-			fwrite(&diag_data, sizeof(__u8), total_length,
+			fwrite(diag_data, sizeof(__u8), total_length,
 				bin_file);
 			if (ferror(bin_file)) {
 				rc = errno;
