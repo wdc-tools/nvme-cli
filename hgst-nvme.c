@@ -175,11 +175,11 @@ static int hgst_cap_diag(int argc, char **argv,
 	__u32 total_length;
 
 	struct config {
-		char file[PATH_MAX];
+		char *file;
 	};
 
 	struct config cfg = {
-		.file = {0}
+		.file = NULL
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
@@ -188,7 +188,6 @@ static int hgst_cap_diag(int argc, char **argv,
 		{0}
 	};
 
-
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
 	if ((strcmp(cfg.file, "") == 0) &&
 			(hgst_get_serial_name(fd, cfg.file) == -1)) {
@@ -196,7 +195,6 @@ static int hgst_cap_diag(int argc, char **argv,
 				"pathname for cap-diag.\n");
 		return -1;
 	}
-
 	total_length = hgst_cap_diag_get_log_length(fd);
 	return hgst_cap_diag_get_data(fd, total_length, cfg.file);
 }
