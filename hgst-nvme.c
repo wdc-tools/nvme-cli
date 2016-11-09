@@ -30,7 +30,7 @@
 /* Purge and Purge Monitor constants */
 #define HGST_NVME_PURGE_CMD_OPCODE		0xDD
 #define HGST_NVME_PURGE_MONITOR_OPCODE		0xDE
-#define HGST_NVME_PUEGE_MONITOR_DATA_LEN	0x2F
+#define HGST_NVME_PURGE_MONITOR_DATA_LEN	0x2F
 #define HGST_NVME_PURGE_MONITOR_CMD_CDW10	0x0000000C
 #define HGST_NVME_PURGE_MONITOR_TIMEOUT		0x7530
 #define HGST_NVME_PURGE_CMD_SEQ_ERR		0x0C
@@ -271,7 +271,7 @@ static int hgst_purge_monitor(int argc, char **argv,
 	char *desc = "Send a Purge Monitor command";
 	int fd;
 	int rc;
-	__u8 output[HGST_NVME_PUEGE_MONITOR_DATA_LEN];
+	__u8 output[HGST_NVME_PURGE_MONITOR_DATA_LEN];
 	double progress_percent;
 	struct nvme_passthru_cmd admin_cmd;
 	struct hgst_nvme_purge_monitor_data *mon;
@@ -284,7 +284,7 @@ static int hgst_purge_monitor(int argc, char **argv,
 	memset(&admin_cmd, 0, sizeof(struct nvme_admin_cmd));
 	admin_cmd.opcode = HGST_NVME_PURGE_MONITOR_OPCODE;
 	admin_cmd.addr = (__u64) output;
-	admin_cmd.data_len = HGST_NVME_PUEGE_MONITOR_DATA_LEN;
+	admin_cmd.data_len = HGST_NVME_PURGE_MONITOR_DATA_LEN;
 	admin_cmd.cdw10 = HGST_NVME_PURGE_MONITOR_CMD_CDW10;
 	admin_cmd.timeout_ms = HGST_NVME_PURGE_MONITOR_TIMEOUT;
 
