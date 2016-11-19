@@ -53,12 +53,12 @@
 
 
 /* Drive log data size */
-static struct hgst_drive_log_size {
+struct hgst_drive_log_size {
 	__u32			drive_log_size;
 };
 
 /* Purge monitor response */
-static struct hgst_nvme_purge_monitor_data {
+struct hgst_nvme_purge_monitor_data {
 	__u16			rsvd1;
 	__u16			rsvd2;
 	__u16			first_erase_failure_cnt;
