@@ -9,6 +9,7 @@
 PLUGIN(NAME("hgst", "HGST vendor specific extensions"),
 	COMMAND_LIST(
 		ENTRY("cap-diag", "HGST Capture-Diagnostics", hgst_cap_diag)
+		ENTRY("drive-log", "HGST Drive Log", hgst_drive_log)
 		ENTRY("purge", "HGST Purge", hgst_purge)
 		ENTRY("purge-monitor", "HGST Purge Monitor", hgst_purge_monitor)
 	)
