@@ -42,9 +42,9 @@
 
 static argconfig_help_func *help_funcs[MAX_HELP_FUNC] = { NULL };
 
-char END_DEFAULT[] = "__end_default__";
+static char END_DEFAULT[] = "__end_default__";
 
-const char *append_usage_str = "";
+static const char *append_usage_str = "";
 
 void argconfig_append_usage(const char *str)
 {
@@ -130,7 +130,7 @@ static void argconfig_print_help(const char *program_desc,
 	print_word_wrapped(program_desc, 0, 0);
 	printf("\n\n\033[1mOptions:\033[0m\n");
 
-	for (s = options; (s->option != 0) && (s != NULL); s++)
+	for (s = options; (s->option != NULL) && (s != NULL); s++)
 		show_option(s);
 }
 
@@ -146,13 +146,13 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 	void *value_addr;
 
 	errno = 0;
-	for (s = options; s->option != 0; s++)
+	for (s = options; s->option != NULL; s++)
 		options_count++;
 
 	long_opts = malloc(sizeof(struct option) * (options_count + 2));
 	short_opts = malloc(sizeof(*short_opts) * (options_count * 3 + 4));
 
-	for (s = options; (s->option != 0) && (option_index < options_count);
+	for (s = options; (s->option != NULL) && (option_index < options_count);
 	     s++) {
 		if (s->short_option != 0) {
 			short_opts[short_index++] = s->short_option;
@@ -193,6 +193,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 	short_opts[short_index++] = 'h';
 	short_opts[short_index] = 0;
 
+	optind = 0;
 	while ((c = getopt_long_only(argc, argv, short_opts, long_opts,
 				&option_index)) != -1) {
 		if (c != 0) {
@@ -243,28 +244,28 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 			}
 			*((int *)value_addr) = tmp;
 		} else if (s->config_type == CFG_BYTE) {
-			uint8_t tmp = strtol(optarg, &endptr, 0);
-			if (errno || tmp < 0 || optarg == endptr) {
+			unsigned long tmp = strtoul(optarg, &endptr, 0);
+			if (errno || tmp >= (1 << 8)  || optarg == endptr) {
 				fprintf(stderr,
-					"Expected positive argument for '%s' but got '%s'!\n",
+					"Expected byte argument for '%s' but got '%s'!\n",
 					long_opts[option_index].name, optarg);
 				goto exit;
 			}
 			*((uint8_t *) value_addr) = tmp;
 		} else if (s->config_type == CFG_SHORT) {
-			uint16_t tmp = strtol(optarg, &endptr, 0);
-			if (errno || tmp < 0 || optarg == endptr) {
+			unsigned long tmp = strtoul(optarg, &endptr, 0);
+			if (errno || tmp >= (1 << 16) || optarg == endptr) {
 				fprintf(stderr,
-					"Expected positive argument for '%s' but got '%s'!\n",
+					"Expected short argument for '%s' but got '%s'!\n",
 					long_opts[option_index].name, optarg);
 				goto exit;
 			}
 			*((uint16_t *) value_addr) = tmp;
 		} else if (s->config_type == CFG_POSITIVE) {
-			uint32_t tmp = strtol(optarg, &endptr, 0);
-			if (errno || tmp < 0 || optarg == endptr) {
+			uint32_t tmp = strtoul(optarg, &endptr, 0);
+			if (errno || optarg == endptr) {
 				fprintf(stderr,
-					"Expected positive argument for '%s' but got '%s'!\n",
+					"Expected word argument for '%s' but got '%s'!\n",
 					long_opts[option_index].name, optarg);
 				goto exit;
 			}
@@ -272,7 +273,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 		} else if (s->config_type == CFG_INCREMENT) {
 			(*((int *)value_addr))++;
 		} else if (s->config_type == CFG_LONG) {
-			*((long *)value_addr) = strtol(optarg, &endptr, 0);
+			*((unsigned long *)value_addr) = strtoul(optarg, &endptr, 0);
 			if (errno || optarg == endptr) {
 				fprintf(stderr,
 					"Expected long integer argument for '%s' but got '%s'!\n",

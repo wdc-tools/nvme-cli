@@ -25,6 +25,10 @@ enum {
 	TEMPT_SINCE_RESET,
 	POWER_CONSUMPTION,
 	TEMPT_SINCE_BOOTUP,
+	POWER_LOSS_PROTECTION,
+	WEARLEVELING_COUNT,
+	HOST_WRITE,
+	THERMAL_THROTTLE_CNT,
 	NR_SMART_ITEMS,
 };
 
@@ -35,7 +39,10 @@ enum {
 #pragma pack(push, 1)
 struct nvme_memblaze_smart_log_item {
 	__u8 id[3];
-	__u8 nmval[2];
+	union {
+		__u8	__nmval[2];
+		__le16  nmval;
+	};
 	union {
 		__u8 rawval[6];
 		struct temperature {
@@ -56,6 +63,18 @@ struct nvme_memblaze_smart_log_item {
 			__le16 max;
 			__le16 min;
 		} temperature_p;
+		struct power_loss_protection {
+			__u8 curr;
+		} power_loss_protection;
+		struct wearleveling_count {
+			__le16 min;
+			__le16 max;
+			__le16 avg;
+		} wearleveling_count;
+		struct thermal_throttle_cnt {
+			__u8 active;
+			__le32 cnt;
+		} thermal_throttle_cnt;
 	};
 	__u8 resv;
 };
@@ -88,12 +107,27 @@ static int compare_fw_version(const char *fw1, const char *fw2)
 	return 0;
 }
 
+static __u32 item_id_2_u32(struct nvme_memblaze_smart_log_item *item)
+{
+	__le32	__id = 0;
+	memcpy(&__id, item->id, 3);
+	return le32_to_cpu(__id);
+}
+
+static __u64 raw_2_u64(const __u8 *buf, size_t len)
+{
+	__le64	val = 0;
+	memcpy(&val, buf, len);
+	return le64_to_cpu(val);
+}
+
 static int show_memblaze_smart_log(int fd, __u32 nsid, const char *devname,
 		struct nvme_memblaze_smart_log *smart)
 {
 	struct nvme_id_ctrl ctrl;
 	char fw_ver[10];
 	int err = 0;
+	struct nvme_memblaze_smart_log_item *item;
 
 	err = nvme_identify_ctrl(fd, &ctrl);
 	if (err)
@@ -115,24 +149,51 @@ static int show_memblaze_smart_log(int fd, __u32 nsid, const char *devname,
 		smart->items[THERMAL_THROTTLE].thermal_throttle.count);
 
 	printf("Maximum temperature in Kelvin since last factory reset		: %u\n",
-		le16toh(smart->items[TEMPT_SINCE_RESET].temperature.max));
+		le16_to_cpu(smart->items[TEMPT_SINCE_RESET].temperature.max));
 	printf("Minimum temperature in Kelvin since last factory reset		: %u\n",
-		le16toh(smart->items[TEMPT_SINCE_RESET].temperature.min));
+		le16_to_cpu(smart->items[TEMPT_SINCE_RESET].temperature.min));
 	if (compare_fw_version(fw_ver, "0.09.0300") != 0) {
 		printf("Maximum temperature in Kelvin since power on			: %u\n",
-			le16toh(smart->items[TEMPT_SINCE_BOOTUP].temperature_p.max));
+			le16_to_cpu(smart->items[TEMPT_SINCE_BOOTUP].temperature_p.max));
 		printf("Minimum temperature in Kelvin since power on			: %u\n",
-			le16toh(smart->items[TEMPT_SINCE_BOOTUP].temperature_p.min));
+			le16_to_cpu(smart->items[TEMPT_SINCE_BOOTUP].temperature_p.min));
 	}
 	printf("Current temperature in Kelvin					: %u\n",
-		le16toh(smart->items[TEMPT_SINCE_RESET].temperature.curr));
+		le16_to_cpu(smart->items[TEMPT_SINCE_RESET].temperature.curr));
 
 	printf("Maximum power in watt since power on				: %u\n",
-		le16toh(smart->items[POWER_CONSUMPTION].power.max));
+		le16_to_cpu(smart->items[POWER_CONSUMPTION].power.max));
 	printf("Minimum power in watt since power on				: %u\n",
-		le16toh(smart->items[POWER_CONSUMPTION].power.min));
+		le16_to_cpu(smart->items[POWER_CONSUMPTION].power.min));
 	printf("Current power in watt						: %u\n",
-		le16toh(smart->items[POWER_CONSUMPTION].power.curr));
+		le16_to_cpu(smart->items[POWER_CONSUMPTION].power.curr));
+
+	item = &smart->items[POWER_LOSS_PROTECTION];
+	if (item_id_2_u32(item) == 0xEC)
+		printf("Power loss protection normalized value				: %u\n",
+			item->power_loss_protection.curr);
+
+	item = &smart->items[WEARLEVELING_COUNT];
+	if (item_id_2_u32(item) == 0xAD) {
+		printf("Percentage of wearleveling count left				: %u\n",
+				le16_to_cpu(item->nmval));
+		printf("Wearleveling count min erase cycle				: %u\n",
+				le16_to_cpu(item->wearleveling_count.min));
+		printf("Wearleveling count max erase cycle				: %u\n",
+				le16_to_cpu(item->wearleveling_count.max));
+		printf("Wearleveling count avg erase cycle				: %u\n",
+				le16_to_cpu(item->wearleveling_count.avg));
+	}
+
+	item = &smart->items[HOST_WRITE];
+	if (item_id_2_u32(item) == 0xF5)
+		printf("Total host write in GiB since device born 			: %llu\n",
+				(unsigned long long)raw_2_u64(item->rawval, sizeof(item->rawval)));
+		
+	item = &smart->items[THERMAL_THROTTLE_CNT];
+	if (item_id_2_u32(item) == 0xEB)
+		printf("Thermal throttling count since device born 			: %u\n",
+				item->thermal_throttle_cnt.cnt);
 
 	return err;
 }
@@ -157,7 +218,7 @@ static int get_additional_smart_log(int argc, char **argv, struct command *cmd, 
 	const struct argconfig_commandline_options command_line_options[] = {
 		{"namespace-id", 'n', "NUM", CFG_POSITIVE, &cfg.namespace_id, required_argument, namespace},
 		{"raw-binary",   'b', "",    CFG_NONE,     &cfg.raw_binary,   no_argument,       raw},
-		{0}
+		{NULL}
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, &cfg, sizeof(cfg));
@@ -234,7 +295,7 @@ static int get_additional_feature(int argc, char **argv, struct command *cmd, st
 		{"raw-binary",     'b', "FLAG", CFG_NONE,     &cfg.raw_binary,     no_argument,       raw_binary},
 		{"cdw11",          'c', "NUM", CFG_POSITIVE, &cfg.cdw11,          required_argument, cdw11},
 		{"human-readable", 'H', "FLAG", CFG_NONE,     &cfg.human_readable, no_argument,       human_readable},
-		{0}
+		{NULL}
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, &cfg, sizeof(cfg));
@@ -327,7 +388,7 @@ static int set_additional_feature(int argc, char **argv, struct command *cmd, st
 		{"data-len",     'l', "NUM",  CFG_POSITIVE, &cfg.data_len,     required_argument, data_len},
 		{"data",         'd', "FILE", CFG_STRING,   &cfg.file,         required_argument, data},
 		{"save",         's', "FLAG", CFG_NONE,     &cfg.save,         no_argument, save},
-		{0}
+		{NULL}
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, &cfg, sizeof(cfg));

@@ -1,5 +1,5 @@
 CFLAGS += -std=gnu99 -O2 -g -Wall -Werror
-CPPFLAGS += -D_GNU_SOURCE
+CPPFLAGS += -D_GNU_SOURCE -D__CHECK_ENDIAN__
 NVME = nvme
 INSTALL ?= install
 DESTDIR =
@@ -31,8 +31,8 @@ override CFLAGS += -DNVME_VERSION='"$(NVME_VERSION)"'
 NVME_DPKG_VERSION=1~`lsb_release -sc`
 
 OBJS := argconfig.o suffix.o parser.o nvme-print.o nvme-ioctl.o \
-	nvme-lightnvm.o fabrics.o json.o plugin.o hgst-nvme.o intel-nvme.o \
-	lnvm-nvme.o memblaze-nvme.o
+	nvme-lightnvm.o fabrics.o json.o plugin.o intel-nvme.o \
+	lnvm-nvme.o memblaze-nvme.o nvme-models.o
 
 nvme: nvme.c nvme.h $(OBJS) NVME-VERSION-FILE
 	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c -o $(NVME) $(OBJS) $(LDFLAGS)
