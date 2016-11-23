@@ -22,6 +22,8 @@
 #define CREATE_CMD
 #include "wdc-nvme.h"
 
+#define WRITE_SIZE	(sizeof(__u8) * 4096)
+
 #define WDC_NVME_SUBCMD_SHIFT	8
 #define WDC_NVME_CAP_DIAGS_CMD_OPCODE	0xC6
 
@@ -35,7 +37,7 @@
 /* Purge and Purge Monitor constants */
 #define WDC_NVME_PURGE_CMD_OPCODE			0xDD
 #define WDC_NVME_PURGE_MONITOR_OPCODE		0xDE
-#define WDC_NVME_PUEGE_MONITOR_DATA_LEN		0x2F
+#define WDC_NVME_PURGE_MONITOR_DATA_LEN		0x2F
 #define WDC_NVME_PURGE_MONITOR_CMD_CDW10	0x0000000C
 #define WDC_NVME_PURGE_MONITOR_TIMEOUT		0x7530
 #define WDC_NVME_PURGE_CMD_SEQ_ERR			0x0C
@@ -88,6 +90,8 @@ static int wdc_get_serial_name(int fd, char *file)
 	struct nvme_id_ctrl ctrl;
 
 	i = sizeof (ctrl.sn) - 1;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
 	ret = nvme_identify_ctrl(fd, &ctrl);
 	if (ret) {
 		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
@@ -107,10 +111,9 @@ static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 		__u32 drive_log_length)
 {
 	FILE *bin_file;
-	long PAGE_SIZE = sysconf(_SC_PAGESIZE);
 
 	if (drive_log_length == 0) {
-		fprintf(stderr, "ERROR : invalid log file lenth\n");
+		fprintf(stderr, "ERROR : invalid log file length\n");
 		return -1;
 	}
 
@@ -120,24 +123,24 @@ static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 		return -1;
 	}
 
-	while (drive_log_length > PAGE_SIZE) {
-		fwrite(&drive_log_data, sizeof (__u8), PAGE_SIZE, bin_file);
+	while (drive_log_length > WRITE_SIZE) {
+		fwrite(drive_log_data, sizeof (__u8), WRITE_SIZE, bin_file);
 		if (ferror(bin_file)) {
-			fprintf (stderr, "ERROR : fwrite : %s\n",
-					strerror(errno));
+			fprintf (stderr, "ERROR : fwrite : %s\n", strerror(errno));
 			return -1;
 		}
-		drive_log_length -= PAGE_SIZE;
+		drive_log_data += WRITE_SIZE;
+		drive_log_length -= WRITE_SIZE;
 	}
 
-	fwrite(&drive_log_data, sizeof (__u8), drive_log_length, bin_file);
+	fwrite(drive_log_data, sizeof (__u8), drive_log_length, bin_file);
 	if (ferror(bin_file)) {
 		fprintf (stderr, "ERROR : fwrite : %s\n", strerror(errno));
 		return -1;
 	}
 
 	if (fflush(bin_file) != 0) {
-		fprintf(stderr, "ERROR : fsync : %s\n", strerror(errno));
+		fprintf(stderr, "ERROR : fflush : %s\n", strerror(errno));
 		return -1;
 	}
 	fclose(bin_file);
@@ -147,10 +150,11 @@ static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 static __u32 wdc_drive_log_length(int fd, __u32 *drive_log_length)
 {
 	int ret;
-	__u8 buf[WDC_NVME_GET_DRIVE_LOG_SIZE_DATA_LEN];
+	__u8 buf[WDC_NVME_GET_DRIVE_LOG_SIZE_DATA_LEN] = {0};
 	struct wdc_log_size *l;
 	struct nvme_admin_cmd admin_cmd;
 
+	l = (struct wdc_log_size *) buf;
 	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
 	admin_cmd.opcode = WDC_NVME_CAP_DIAGS_CMD_OPCODE;
 	admin_cmd.addr = (__u64) buf;
@@ -160,13 +164,11 @@ static __u32 wdc_drive_log_length(int fd, __u32 *drive_log_length)
 			WDC_NVME_SUBCMD_SHIFT | WDC_NVME_GET_DRIVE_LOG_CMD);
 
 	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
-	if (ret == 0) {
-		l = (struct wdc_log_size *) buf;
-	} else {
-		fprintf(stderr, "NVMe Status:%s(%x)\n",
-				nvme_status_to_string(ret), ret);
+	if (ret != 0) {
 		l->log_size = 0;
 		ret = -1;
+		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret),
+				ret);
 	}
 
 	*drive_log_length = l->log_size;
@@ -181,7 +183,7 @@ static int wdc_do_drive_log(int fd, char *file)
 	struct nvme_admin_cmd admin_cmd;
 
 	ret = wdc_drive_log_length(fd, &drive_log_length);
-	if (ret != 0) {
+	if (ret == -1) {
 		fprintf(stderr, "ERROR : failed to get the length of drive "
 				"log\n");
 		return -1;
@@ -207,8 +209,7 @@ static int wdc_do_drive_log(int fd, char *file)
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret),
 			ret);
 	if (ret == 0) {
-		ret = wdc_create_log_file(file, drive_log_data,
-				drive_log_length);
+		ret = wdc_create_log_file(file, drive_log_data, drive_log_length);
 	}
 	free(drive_log_data);
 	return ret;
@@ -230,10 +231,9 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
-	{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument,
-		file},
-	{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
-	{0}
+		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+		{0}
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
@@ -287,8 +287,8 @@ static int wdc_purge(int argc, char **argv,
 	int ret;
 	struct nvme_passthru_cmd admin_cmd;
 	const struct argconfig_commandline_options command_line_options[] = {
-	{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
-	{0}
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
+		{0}
 	};
 
 	err_str = "";
@@ -311,8 +311,7 @@ static int wdc_purge(int argc, char **argv,
 		}
 	}
 	fprintf(stderr, "%s", err_str);
-	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret),
-			ret);
+	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
 	return ret;
 }
 
@@ -322,20 +321,20 @@ static int wdc_purge_monitor(int argc, char **argv,
 	char *desc = "Send a Purge Monitor command.";
 	int fd;
 	int ret;
-	__u8 output[WDC_NVME_PUEGE_MONITOR_DATA_LEN];
-	double progress_peretent;
+	__u8 output[WDC_NVME_PURGE_MONITOR_DATA_LEN];
+	double progress_percent;
 	struct nvme_passthru_cmd admin_cmd;
 	struct wdc_nvme_purge_monitor_data *mon;
 	const struct argconfig_commandline_options command_line_options[] = {
-	{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
-	{0}
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
+		{0}
 	};
 
 	memset(output, 0, sizeof (output));
 	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
 	admin_cmd.opcode = WDC_NVME_PURGE_MONITOR_OPCODE;
 	admin_cmd.addr = (__u64) output;
-	admin_cmd.data_len = WDC_NVME_PUEGE_MONITOR_DATA_LEN;
+	admin_cmd.data_len = WDC_NVME_PURGE_MONITOR_DATA_LEN;
 	admin_cmd.cdw10 = WDC_NVME_PURGE_MONITOR_CMD_CDW10;
 	admin_cmd.timeout_ms = WDC_NVME_PURGE_MONITOR_TIMEOUT;
 
@@ -346,10 +345,10 @@ static int wdc_purge_monitor(int argc, char **argv,
 		printf("Purge state = 0x%0x\n", admin_cmd.result);
 		printf("%s\n", wdc_purge_mon_status_to_string(admin_cmd.result));
 		if (admin_cmd.result == WDC_NVME_PURGE_STATE_BUSY) {
-			progress_peretent =
+			progress_percent =
 				((double)mon->entire_progress_current * 100) /
 				mon->entire_progress_total;
-			printf("Purge Progress = %f%%\n", progress_peretent);
+			printf("Purge Progress = %f%%\n", progress_percent);
 		}
 	}
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
