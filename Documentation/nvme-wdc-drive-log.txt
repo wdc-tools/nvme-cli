@@ -3,7 +3,7 @@ nvme-wdc-drive-log(1)
 
 NAME
 ----
-nvme-wdc-drive-log - Retrieve hgst device's drive log and save to file.
+nvme-wdc-drive-log - Retrieve WDC device's drive log and save to file.
 
 SYNOPSIS
 --------
