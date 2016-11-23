@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
 <meta name="generator" content="AsciiDoc 8.6.8" />
-<title>nvme-hgst-purge-monitor(1)</title>
+<title>nvme-wdc-purge(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -732,12 +732,12 @@ asciidoc.install();
 <body class="manpage">
 <div id="header">
 <h1>
-nvme-hgst-purge-monitor(1) Manual Page
+nvme-wdc-purge(1) Manual Page
 </h1>
 <h2>NAME</h2>
 <div class="sectionbody">
-<p>nvme-hgst-purge-monitor -
-   Send NVMe HGST Purge-Monitor Vendor Unique Command, return result
+<p>nvme-wdc-purge -
+   Send NVMe WDC Purge Vendor Unique Command, return result
 </p>
 </div>
 </div>
@@ -746,7 +746,7 @@ nvme-hgst-purge-monitor(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>nvme hgst purge-monitor</em> &lt;device&gt;</pre>
+<pre class="content"><em>nvme wdc purge</em> &lt;device&gt;</pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -754,46 +754,8 @@ nvme-hgst-purge-monitor(1) Manual Page
 <div class="sect1">
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>For the NVMe device given, send a Vendor Unique HGST Purge-Monitor command and
-provide the status of the purge command.</p></div>
-<div class="paragraph"><p>Expected status and description :-</p></div>
-<div class="tableblock">
-<table rules="all"
-width="100%"
-frame="border"
-cellspacing="0" cellpadding="4">
-<col width="50%" />
-<col width="50%" />
-<thead>
-<tr>
-<th align="left" valign="top">Status Code </th>
-<th align="left" valign="top">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="left" valign="top"><p class="table">0x00</p></td>
-<td align="left" valign="top"><p class="table">Purge State Idle.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x01</p></td>
-<td align="left" valign="top"><p class="table">Purge State Done.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x02</p></td>
-<td align="left" valign="top"><p class="table">Purge State Busy.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x03</p></td>
-<td align="left" valign="top"><p class="table">Purge State Error : Purge operation resulted in error, power cyale required.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x04</p></td>
-<td align="left" valign="top"><p class="table">Purge State Error : Purge operation interrupted by power cycle or reset.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
+<div class="paragraph"><p>For the NVMe device given, sends a Vendor Unique WDC Purge command and
+provides the result.</p></div>
 <div class="paragraph"><p>The &lt;device&gt; parameter is mandatory and may be either the NVMe character
 device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1).</p></div>
 <div class="paragraph"><p>On success it returns 0, error code otherwise.</p></div>
@@ -811,11 +773,11 @@ device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1).</p></di
 <div class="ulist"><ul>
 <li>
 <p>
-Has the program issue HGST Purge-Monitor Vendor Unique Command :
+Has the program issue WDC Purge Vendor Unique Command :
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme hgst purge-monitor /dev/nvme0</code></pre>
+<pre><code># nvme wdc purge /dev/nvme0n1</code></pre>
 </div></div>
 </li>
 </ul></div>
@@ -824,20 +786,14 @@ Has the program issue HGST Purge-Monitor Vendor Unique Command :
 <div class="sect1">
 <h2 id="_nvme">NVME</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>Part of the nvme HGST Vendor Unique Command suite.</p></div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_todo">TODO</h2>
-<div class="sectionbody">
-<div class="paragraph"><p>Review all the description before final delivery.</p></div>
+<div class="paragraph"><p>Part of the nvme-user suite.</p></div>
 </div>
 </div>
 </div>
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-09-28 18:06:13 PDT
+Last updated 2016-11-22 16:00:10 PST
 </div>
 </div>
 </body>

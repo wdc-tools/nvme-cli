@@ -1,13 +1,13 @@
 '\" t
-.\"     Title: nvme-hgst-purge
+.\"     Title: nvme-wdc-drive-log
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 09/28/2016
+.\"      Date: 11/22/2016
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-HGST\-PURGE" "1" "09/28/2016" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-DRIVE\-LO" "1" "11/22/2016" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,22 +28,25 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-nvme-hgst-purge \- Send NVMe HGST Purge Vendor Unique Command, return result
+nvme-wdc-drive-log \- Retrieve hgst device\*(Aqs drive log and save to file\&.
 .SH "SYNOPSIS"
 .sp
 .nf
-\fInvme hgst purge\fR <device>
+\fInvme wdc drive\-log\fR <device> [\-\-output\-file=<FILE>, \-o <FILE>]
 .fi
 .SH "DESCRIPTION"
 .sp
-For the NVMe device given, sends a Vendor Unique HGST Purge command and provides the result\&.
+For the NVMe device given, sends the wdc vendor unique drive log request and saves the result to a file\&.
 .sp
 The <device> parameter is mandatory and may be either the NVMe character device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1)\&.
 .sp
-On success it returns 0, error code otherwise\&.
+This will only work on wdc devices\&. Results for any other device are undefined\&.
 .SH "OPTIONS"
-.sp
-No options yet\&.
+.PP
+\-o <FILE>, \-\-output\-file=<FILE>
+.RS 4
+Output file; defaults to device serial number
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -54,13 +57,34 @@ No options yet\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-Has the program issue HGST Purge Vendor Unique Command :
+Gets the drive log from the device and saves to default file :
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-# nvme hgst purge /dev/nvme0n1
+# nvme wdc drive\-log /dev/nvme0
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Gets the drive log from the device and saves to defined file :
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# nvme wdc drive\-log /dev/nvme0 \-o wdc_drive_log
 .fi
 .if n \{\
 .RE
@@ -68,7 +92,4 @@ Has the program issue HGST Purge Vendor Unique Command :
 .RE
 .SH "NVME"
 .sp
-Part of the nvme HGST Vendor Unique Command suite\&.
-.SH "TODO"
-.sp
-Review all the description before final delivery\&.
+Part of the nvme\-user suite

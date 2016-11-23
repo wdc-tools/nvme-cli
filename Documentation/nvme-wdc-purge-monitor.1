@@ -1,13 +1,13 @@
 '\" t
-.\"     Title: nvme-hgst-purge-monitor
+.\"     Title: nvme-wdc-purge-monitor
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 09/28/2016
+.\"      Date: 11/22/2016
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-HGST\-PURGE\-M" "1" "09/28/2016" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-PURGE\-MO" "1" "11/22/2016" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,15 +28,15 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-nvme-hgst-purge-monitor \- Send NVMe HGST Purge\-Monitor Vendor Unique Command, return result
+nvme-wdc-purge-monitor \- Send NVMe WDC Purge\-Monitor Vendor Unique Command, return result
 .SH "SYNOPSIS"
 .sp
 .nf
-\fInvme hgst purge\-monitor\fR <device>
+\fInvme wdc purge\-monitor\fR <device>
 .fi
 .SH "DESCRIPTION"
 .sp
-For the NVMe device given, send a Vendor Unique HGST Purge\-Monitor command and provide the status of the purge command\&.
+For the NVMe device given, send a Vendor Unique WDC Purge\-Monitor command and provide the status of the purge command\&.
 .sp
 Expected status and description :\-
 .TS
@@ -107,13 +107,13 @@ No options yet\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-Has the program issue HGST Purge\-Monitor Vendor Unique Command :
+Has the program issue WDC Purge\-Monitor Vendor Unique Command :
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-# nvme hgst purge\-monitor /dev/nvme0
+# nvme wdc purge\-monitor /dev/nvme0
 .fi
 .if n \{\
 .RE
@@ -121,7 +121,4 @@ Has the program issue HGST Purge\-Monitor Vendor Unique Command :
 .RE
 .SH "NVME"
 .sp
-Part of the nvme HGST Vendor Unique Command suite\&.
-.SH "TODO"
-.sp
-Review all the description before final delivery\&.
+Part of the nvme\-user suite\&.

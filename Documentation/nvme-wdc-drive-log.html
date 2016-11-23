@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
 <meta name="generator" content="AsciiDoc 8.6.8" />
-<title>nvme-hgst-cap-diag(1)</title>
+<title>nvme-wdc-drive-log(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -732,12 +732,12 @@ asciidoc.install();
 <body class="manpage">
 <div id="header">
 <h1>
-nvme-hgst-cap-diag(1) Manual Page
+nvme-wdc-drive-log(1) Manual Page
 </h1>
 <h2>NAME</h2>
 <div class="sectionbody">
-<p>nvme-hgst-cap-diag -
-   Retrieve HGST device's diagnostic log and save to file.
+<p>nvme-wdc-drive-log -
+   Retrieve hgst device's drive log and save to file.
 </p>
 </div>
 </div>
@@ -746,7 +746,7 @@ nvme-hgst-cap-diag(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>nvme hgst cap-diag</em> &lt;device&gt; [--file=&lt;FILE&gt;, -f &lt;FILE&gt;]</pre>
+<pre class="content"><em>nvme wdc drive-log</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]</pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -754,55 +754,13 @@ nvme-hgst-cap-diag(1) Manual Page
 <div class="sect1">
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>For the NVMe device given, sends the HGST Vendor Unique Capture-Diagnostics
-request and saves the result to a compressed archive file. The NVMe device
-must refer to a single physical device (namespaces are not supportedi).
-By default it will save the compressed arvhive in the current directory
-of the program being executed. In absence of pathname it will create a file
-with Serial Number of the given NVMe deivce.</p></div>
-<div class="paragraph"><p>This will only work on HGST devices supporting this feature.
-Results for any other device are undefined.</p></div>
-<div class="paragraph"><p>Expected status and description :-</p></div>
-<div class="tableblock">
-<table rules="all"
-width="100%"
-frame="border"
-cellspacing="0" cellpadding="4">
-<col width="50%" />
-<col width="50%" />
-<thead>
-<tr>
-<th align="left" valign="top">Status Code </th>
-<th align="left" valign="top">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="left" valign="top"><p class="table">0x00</p></td>
-<td align="left" valign="top"><p class="table">Purge State Idle.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x01</p></td>
-<td align="left" valign="top"><p class="table">Purge State Done.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x02</p></td>
-<td align="left" valign="top"><p class="table">Purge State Busy.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x03</p></td>
-<td align="left" valign="top"><p class="table">Purge State Error : Purge operation resulted in error, power cyale required.</p></td>
-</tr>
-<tr>
-<td align="left" valign="top"><p class="table">0x04</p></td>
-<td align="left" valign="top"><p class="table">Purge State Error : Purge operation interrupted by power cycle or reset.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="paragraph"><p>The &lt;device&gt; parameter is mandatory and may be either the NVMe character
-device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1).</p></div>
-<div class="paragraph"><p>On success it returns 0, error code otherwise.</p></div>
+<div class="paragraph"><p>For the NVMe device given, sends the wdc vendor unique drive log
+request and saves the result to a file.</p></div>
+<div class="paragraph"><p>The &lt;device&gt; parameter is mandatory and may be either the NVMe
+character device (ex: /dev/nvme0), or a namespace block device (ex:
+/dev/nvme0n1).</p></div>
+<div class="paragraph"><p>This will only work on wdc devices. Results for any other device are
+undefined.</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -810,14 +768,14 @@ device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1).</p></di
 <div class="sectionbody">
 <div class="dlist"><dl>
 <dt class="hdlist1">
--f &lt;FILE&gt;
+-o &lt;FILE&gt;
 </dt>
 <dt class="hdlist1">
---file=&lt;FILE&gt;
+--output-file=&lt;FILE&gt;
 </dt>
 <dd>
 <p>
-        Output file; defaults to device name provided
+        Output file; defaults to device serial number
 </p>
 </dd>
 </dl></div>
@@ -829,27 +787,20 @@ device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1).</p></di
 <div class="ulist"><ul>
 <li>
 <p>
-Has the program issue HGST cap-diag Vendor Unique Command without pathname:
+Gets the drive log from the device and saves to default file :
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme hgst cap-diag /dev/nvme0</code></pre>
+<pre><code># nvme wdc drive-log /dev/nvme0</code></pre>
 </div></div>
 </li>
-</ul></div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_examples_2">EXAMPLES</h2>
-<div class="sectionbody">
-<div class="ulist"><ul>
 <li>
 <p>
-Has the program issue HGST Purge Vendor Unique Command with pathname:
+Gets the drive log from the device and saves to defined file :
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme hgst cap-diag /dev/nvme0 -f /tmp/test</code></pre>
+<pre><code># nvme wdc drive-log /dev/nvme0 -o wdc_drive_log</code></pre>
 </div></div>
 </li>
 </ul></div>
@@ -858,20 +809,14 @@ Has the program issue HGST Purge Vendor Unique Command with pathname:
 <div class="sect1">
 <h2 id="_nvme">NVME</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>Part of the nvme HGST Vendor Unique Command suite.</p></div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_todo">TODO</h2>
-<div class="sectionbody">
-<div class="paragraph"><p>Review all the description before final delivery.</p></div>
+<div class="paragraph"><p>Part of the nvme-user suite</p></div>
 </div>
 </div>
 </div>
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-09-30 14:46:11 PDT
+Last updated 2016-11-22 16:00:25 PST
 </div>
 </div>
 </body>

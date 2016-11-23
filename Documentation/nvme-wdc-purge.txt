@@ -1,18 +1,18 @@
-nvme-hgst-purge(1)
+nvme-wdc-purge(1)
 ==================
 
 NAME
 ----
-nvme-hgst-purge - Send NVMe HGST Purge Vendor Unique Command, return result
+nvme-wdc-purge - Send NVMe WDC Purge Vendor Unique Command, return result
 
 SYNOPSIS
 --------
 [verse]
-'nvme hgst purge' <device>
+'nvme wdc purge' <device>
 
 DESCRIPTION
 -----------
-For the NVMe device given, sends a Vendor Unique HGST Purge command and
+For the NVMe device given, sends a Vendor Unique WDC Purge command and
 provides the result.
 
 The <device> parameter is mandatory and may be either the NVMe character
@@ -26,10 +26,10 @@ No options yet.
 
 EXAMPLES
 --------
-* Has the program issue HGST Purge Vendor Unique Command :
+* Has the program issue WDC Purge Vendor Unique Command :
 +
 ------------
-# nvme hgst purge /dev/nvme0n1
+# nvme wdc purge /dev/nvme0n1
 ------------
 
 NVME
