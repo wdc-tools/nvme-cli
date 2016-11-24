@@ -354,8 +354,7 @@ static int wdc_do_drive_log(int fd, char *file)
 
 	ret = wdc_drive_log_length(fd, &drive_log_length);
 	if (ret == -1) {
-		fprintf(stderr, "ERROR : failed to get the length of drive "
-				"log\n");
+		fprintf(stderr, "ERROR : failed to get the length of drive log\n");
 		return -1;
 	}
 
@@ -410,8 +409,7 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 	if (cfg.file == NULL) {
 		cfg.file = f;
 		if (wdc_get_serial_name(fd, cfg.file) == -1) {
-			fprintf(stderr, "ERROR : failed to generate "
-					"file name\n");
+			fprintf(stderr, "ERROR : failed to generate file name\n");
 			return -1;
 		}
 	}
