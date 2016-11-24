@@ -3,7 +3,7 @@ nvme-wdc-pfail-dump(1)
 
 NAME
 ----
-nvme-wdc-pfail-dump - Retrieve hgst device's pfail dump and save to file.
+nvme-wdc-pfail-dump - Retrieve WDC device's pfail dump and save to file.
 
 SYNOPSIS
 --------

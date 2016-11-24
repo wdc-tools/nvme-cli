@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <linux/fs.h>
 #include <linux/limits.h>
 #include <asm/byteorder.h>
@@ -77,13 +75,19 @@
 #define WDC_NVME_PURGE_STATE_REQ_PWR_CYC	0x03
 #define WDC_NVME_PURGE_STATE_PWR_CYC_PURGE	0x04
 
-static int wdc_get_serial_name(int fd, char *file);
+static int wdc_get_serial_name(int fd, char *file, size_t len);
 static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 		__u32 drive_log_length);
 static int wdc_do_clear_dump(int fd, __u8 opcode, __u32 cdw12);
+static int wdc_do_dump(int fd, __u32 opcode,__u32 data_len, __u32 cdw10,
+		__u32 cdw12, __u32 dump_length, char *file);
 static __u32 wdc_crash_dump_length(int fd, __u32 *crash_dump_length);
 static int wdc_do_crash_dump(int fd, char *file);
 static int wdc_crash_dump(int argc, char **argv, struct command *command,
+		struct plugin *plugin);
+static __u32 wdc_pfail_dump_length(int fd, __u32 *pfail_dump_length);
+static int wdc_do_pfail_dump(int fd, char *file);
+static int wdc_pfail_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 static __u32 wdc_drive_log_length(int fd, __u32 *drive_log_length);
 static int wdc_do_drive_log(int fd, char *file);
@@ -116,7 +120,7 @@ struct wdc_nvme_purge_monitor_data {
 };
 
 
-static int wdc_get_serial_name(int fd, char *file)
+static int wdc_get_serial_name(int fd, char *file, size_t len)
 {
 	int i;
 	int ret;
@@ -136,7 +140,7 @@ static int wdc_get_serial_name(int fd, char *file)
 		ctrl.sn[i] = '\0';
 		i--;
 	}
-	sprintf(file, "%s.bin", ctrl.sn);
+	snprintf(file, len, "%s.bin", ctrl.sn);
 	return 0;
 }
 
@@ -279,7 +283,7 @@ static int wdc_crash_dump(int argc, char **argv, struct command *command,
 	char *desc = "Crash Dump.";
 	char *file = "Output file pathname.";
 	char *clear = "Erases the Crash Dump.";
-	char f[0x100];
+	char f[PATH_MAX];
 	int fd;
 	__u8 opcode = WDC_NVME_CLEAR_DUMP_OPCODE;
 	__u32 cdw12 = ((WDC_NVME_CLEAR_CRASH_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
@@ -296,7 +300,7 @@ static int wdc_crash_dump(int argc, char **argv, struct command *command,
 
 	const struct argconfig_commandline_options command_line_options[] = {
 		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
-		{"clear", 'c', CFG_NONE, CFG_NONE, &cfg.clear, no_argument, clear},
+		{"clear", 'c', NULL, CFG_NONE, &cfg.clear, no_argument, clear},
 		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
 		{0}
 	};
@@ -309,7 +313,7 @@ static int wdc_crash_dump(int argc, char **argv, struct command *command,
 
 	if (cfg.file == NULL) {
 		cfg.file = f;
-		if (wdc_get_serial_name(fd, cfg.file) == -1) {
+		if (wdc_get_serial_name(fd, cfg.file, PATH_MAX) == -1) {
 			fprintf(stderr, "ERROR : failed to generate file name\n");
 			return -1;
 		}
@@ -389,7 +393,7 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 {
 	char *desc = "Capture Drive Log.";
 	char *file = "Output file pathname.";
-	char f[0x100];
+	char f[PATH_MAX];
 	int fd;
 	struct config {
 		char *file;
@@ -408,7 +412,7 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
 	if (cfg.file == NULL) {
 		cfg.file = f;
-		if (wdc_get_serial_name(fd, cfg.file) == -1) {
+		if (wdc_get_serial_name(fd, cfg.file, PATH_MAX) == -1) {
 			fprintf(stderr, "ERROR : failed to generate file name\n");
 			return -1;
 		}
@@ -471,7 +475,7 @@ static int wdc_pfail_dump(int argc, char **argv, struct command *command,
 	char *desc = "Power Fail Dump.";
 	char *file = "Output file pathname.";
 	char *clear = "Erases the pfail crash dump.";
-	char f[0x100];
+	char f[PATH_MAX];
 	int fd;
 	__u8 opcode = WDC_NVME_CLEAR_DUMP_OPCODE;
 	__u32 cdw12 = WDC_NVME_CLEAR_PFAIL_DUMP_CMD;
@@ -487,7 +491,7 @@ static int wdc_pfail_dump(int argc, char **argv, struct command *command,
 
 	const struct argconfig_commandline_options command_line_options[] = {
 		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
-		{"clear", 'c', CFG_NONE, CFG_NONE, &cfg.clear, no_argument, clear},
+		{"clear", 'c', NULL, CFG_NONE, &cfg.clear, no_argument, clear},
 		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
 		{0}
 	};
@@ -500,7 +504,7 @@ static int wdc_pfail_dump(int argc, char **argv, struct command *command,
 
 	if (cfg.file == NULL) {
 		cfg.file = f;
-		if (wdc_get_serial_name(fd, cfg.file) == -1) {
+		if (wdc_get_serial_name(fd, cfg.file, PATH_MAX) == -1) {
 			fprintf(stderr, "ERROR : failed to generate file name\n");
 			return -1;
 		}
