@@ -32,7 +32,7 @@ NVME_DPKG_VERSION=1~`lsb_release -sc`
 
 OBJS := argconfig.o suffix.o parser.o nvme-print.o nvme-ioctl.o \
 	nvme-lightnvm.o fabrics.o json.o plugin.o intel-nvme.o \
-	lnvm-nvme.o memblaze-nvme.o wdc-nvme.o nvme-models.o 
+	lnvm-nvme.o memblaze-nvme.o wdc-nvme.o nvme-models.o
 
 nvme: nvme.c nvme.h $(OBJS) NVME-VERSION-FILE
 	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c -o $(NVME) $(OBJS) $(LDFLAGS)
@@ -45,6 +45,9 @@ nvme.o: nvme.c nvme.h nvme-print.h nvme-ioctl.h argconfig.h suffix.h nvme-lightn
 
 doc: $(NVME)
 	$(MAKE) -C Documentation
+
+test:
+	$(MAKE) -C tests/ run
 
 all: doc
 
@@ -136,4 +139,4 @@ rpm: dist
 	$(RPMBUILD) -ta nvme-$(NVME_VERSION).tar.gz
 
 .PHONY: default doc all clean clobber install-man install-bin install
-.PHONY: dist pkg dist-orig deb deb-light rpm FORCE
+.PHONY: dist pkg dist-orig deb deb-light rpm FORCE test

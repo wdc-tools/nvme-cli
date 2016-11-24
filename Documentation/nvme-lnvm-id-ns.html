@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 8.6.8" />
+<meta name="generator" content="AsciiDoc 8.6.7" />
 <title>nvme-lnvm-id-ns(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -87,14 +87,10 @@ ul, ol, li > p {
 ul > li     { color: #aaa; }
 ul > li > * { color: black; }
 
-.monospaced, code, pre {
-  font-family: "Courier New", Courier, monospace;
-  font-size: inherit;
-  color: navy;
+pre {
   padding: 0;
   margin: 0;
 }
-
 
 #author {
   color: #527bbd;
@@ -419,6 +415,12 @@ div.unbreakable { page-break-inside: avoid; }
  *
  * */
 
+tt {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+}
+
 div.tableblock {
   margin-top: 1.0em;
   margin-bottom: 1.5em;
@@ -451,6 +453,12 @@ div.tableblock > table[frame="vsides"] {
  * html5 specific
  *
  * */
+
+.monospaced {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+}
 
 table.tableblock {
   margin-top: 1.0em;
@@ -531,8 +539,6 @@ body.manpage div.sectionbody {
 @media print {
   body.manpage div#toc { display: none; }
 }
-
-
 </style>
 <script type="text/javascript">
 /*<![CDATA[*/
@@ -825,7 +831,7 @@ Retrieve the geometry from nvme0
 </ul></div>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme lnvm-id-ns /dev/nvme0 -n 1</code></pre>
+<pre><tt># nvme lnvm-id-ns /dev/nvme0 -n 1</tt></pre>
 </div></div>
 </div>
 </div>
@@ -839,7 +845,7 @@ Retrieve the geometry from nvme0
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-22 16:07:51 PST
+Last updated 2016-06-02 13:08:00 MDT
 </div>
 </div>
 </body>

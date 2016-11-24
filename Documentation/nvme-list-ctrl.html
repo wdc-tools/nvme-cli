@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 8.6.8" />
+<meta name="generator" content="AsciiDoc 8.6.7" />
 <title>nvme-id-ns(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -87,14 +87,10 @@ ul, ol, li > p {
 ul > li     { color: #aaa; }
 ul > li > * { color: black; }
 
-.monospaced, code, pre {
-  font-family: "Courier New", Courier, monospace;
-  font-size: inherit;
-  color: navy;
+pre {
   padding: 0;
   margin: 0;
 }
-
 
 #author {
   color: #527bbd;
@@ -419,6 +415,12 @@ div.unbreakable { page-break-inside: avoid; }
  *
  * */
 
+tt {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+}
+
 div.tableblock {
   margin-top: 1.0em;
   margin-bottom: 1.5em;
@@ -433,7 +435,7 @@ thead, p.table.header {
 p.table {
   margin-top: 0;
 }
-/* Because the table frame attribute is overriden by CSS in most browsers. */
+/* Because the table frame attribute is overridden by CSS in most browsers. */
 div.tableblock > table[frame="void"] {
   border-style: none;
 }
@@ -451,6 +453,12 @@ div.tableblock > table[frame="vsides"] {
  * html5 specific
  *
  * */
+
+.monospaced {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+}
 
 table.tableblock {
   margin-top: 1.0em;
@@ -531,8 +539,6 @@ body.manpage div.sectionbody {
 @media print {
   body.manpage div#toc { display: none; }
 }
-
-
 </style>
 <script type="text/javascript">
 /*<![CDATA[*/
@@ -753,7 +759,7 @@ DESCRIPTION</pre>
 </div></div>
 <div class="listingblock">
 <div class="content">
-<pre><code>For the NVMe device given, sends an identify command for controller list
+<pre><tt>For the NVMe device given, sends an identify command for controller list
 and provides the result and returned structure. This uses either mode
 12h or 13h depending on the requested namespace identifier.
 
@@ -765,7 +771,7 @@ The starting controller in the list always begins with 0 unless the
 On success, the controller array is printed for each index and controller
 identifier.
 
-OPTIONS</code></pre>
+OPTIONS</tt></pre>
 </div></div>
 <div class="dlist"><dl>
 <dt class="hdlist1">
@@ -812,7 +818,7 @@ OPTIONS</code></pre>
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-22 16:07:51 PST
+Last updated 2016-02-26 08:28:20 MST
 </div>
 </div>
 </body>
