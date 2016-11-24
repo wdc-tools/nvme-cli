@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
 <meta name="generator" content="AsciiDoc 8.6.8" />
-<title>nvme-wdc-crash-dump(1)</title>
+<title>nvme-wdc-pfail-dump(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -732,12 +732,12 @@ asciidoc.install();
 <body class="manpage">
 <div id="header">
 <h1>
-nvme-wdc-crash-dump(1) Manual Page
+nvme-wdc-pfail-dump(1) Manual Page
 </h1>
 <h2>NAME</h2>
 <div class="sectionbody">
-<p>nvme-wdc-crash-dump -
-   Retrieve hgst device's crash dump and save to file.
+<p>nvme-wdc-pfail-dump -
+   Retrieve hgst device's pfail dump and save to file.
 </p>
 </div>
 </div>
@@ -746,7 +746,7 @@ nvme-wdc-crash-dump(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>nvme wdc crash-dump</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]
+<pre class="content"><em>nvme wdc pfail-dump</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]
                         [--clear, -c]</pre>
 <div class="attribution">
 </div></div>
@@ -755,9 +755,8 @@ nvme-wdc-crash-dump(1) Manual Page
 <div class="sect1">
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>For the NVMe device given, sends the WDC vendor unique crash dump
-request and saves the result to a file. Crash dump for the WDC device(s)
-can be cleared using -c or --clear option.</p></div>
+<div class="paragraph"><p>For the NVMe device given, sends the WDC vendor unique pfail dump
+request and saves the result to a file.</p></div>
 <div class="paragraph"><p>The &lt;device&gt; parameter is mandatory NVMe character device (ex: /dev/nvme0).</p></div>
 <div class="paragraph"><p>This will only work on WDC devices. Results for any other device are
 undefined.</p></div>
@@ -786,7 +785,7 @@ undefined.</p></div>
 </dt>
 <dd>
 <p>
-        Clear crash dump from device
+        Clear pfail log
 </p>
 </dd>
 </dl></div>
@@ -798,38 +797,38 @@ undefined.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-Gets the crash dump from the device and saves to default file:
+Gets the pfail dump from the device and saves to default file:
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc crash-dump /dev/nvme0</code></pre>
+<pre><code># nvme wdc pfail-dump /dev/nvme0</code></pre>
 </div></div>
 </li>
 <li>
 <p>
-Clears the crash dump:
+Gets the pfail dump from the device, saves to default file and clears it:
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc crash-dump /dev/nvme0 -c</code></pre>
+<pre><code># nvme wdc pfail-dump /dev/nvme0 -c</code></pre>
 </div></div>
 </li>
 <li>
 <p>
-Gets the crash dump from the device and saves to defined file:
+Gets the pfail dump from the device and saves to defined file:
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc crash-dump /dev/nvme0 -o GF1-crash-dump</code></pre>
+<pre><code># nvme wdc pfail-dump /dev/nvme0 -o GF1-pfail-dump</code></pre>
 </div></div>
 </li>
 <li>
 <p>
-Clears the crash dump:
+Clears the pfail dump:
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc crash-dump /dev/nvme0 --clear</code></pre>
+<pre><code># nvme wdc pfail-dump /dev/nvme0 --clear</code></pre>
 </div></div>
 </li>
 </ul></div>
@@ -845,7 +844,7 @@ Clears the crash dump:
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-23 19:07:35 PST
+Last updated 2016-11-23 19:07:34 PST
 </div>
 </div>
 </body>

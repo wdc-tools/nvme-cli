@@ -51,6 +51,17 @@
 #define WDC_NVME_GET_DRIVE_LOG_CMD				0x20
 #define WDC_NVME_GET_DRIVE_LOG_BIN_LOG_SUBCMD	0x00
 
+/* Pfail Crash dump */
+#define WDC_NVME_PFAIL_DUMP_SIZE_OPCODE		WDC_NVME_CAP_DIAGS_CMD_OPCODE
+#define WDC_NVME_PFAIL_DUMP_SIZE_DATA_LEN	0x08
+#define WDC_NVME_PFAIL_DUMP_SIZE_NDT		0x02
+#define WDC_NVME_PFAIL_DUMP_SIZE_SUBCMD		0x05
+#define WDC_NVME_PFAIL_DUMP_SIZE_CMD		0x20
+
+#define WDC_NVME_PFAIL_DUMP_OPCODE		WDC_NVME_CAP_DIAGS_CMD_OPCODE
+#define WDC_NVME_PFAIL_DUMP_SUBCMD		0x06
+#define WDC_NVME_PFAIL_DUMP_CMD			0x20
+
 /* Purge and Purge Monitor constants */
 #define WDC_NVME_PURGE_CMD_OPCODE			0xDD
 #define WDC_NVME_PURGE_MONITOR_OPCODE		0xDE
@@ -69,9 +80,9 @@
 static int wdc_get_serial_name(int fd, char *file);
 static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 		__u32 drive_log_length);
-static int wdc_do_clear_crash_dump(int fd, char *file);
+static int wdc_do_clear_dump(int fd, __u8 opcode, __u32 cdw12);
 static __u32 wdc_crash_dump_length(int fd, __u32 *crash_dump_length);
-static int wdc_do_crash_dump(int fd, char *file, int clear);
+static int wdc_do_crash_dump(int fd, char *file);
 static int wdc_crash_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 static __u32 wdc_drive_log_length(int fd, __u32 *drive_log_length);
@@ -169,22 +180,19 @@ static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 	return 0;
 }
 
-static int wdc_do_clear_crash_dump(int fd, char *file)
+static int wdc_do_clear_dump(int fd, __u8 opcode, __u32 cdw12)
 {
 	int ret;
 	struct nvme_admin_cmd admin_cmd;
 
 	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
-	admin_cmd.opcode = WDC_NVME_CLEAR_DUMP_OPCODE;
-	admin_cmd.cdw12 = ((WDC_NVME_CLEAR_CRASH_DUMP_SUBCMD <<
-				WDC_NVME_SUBCMD_SHIFT) | WDC_NVME_CLEAR_CRASH_DUMP_CMD);
-
+	admin_cmd.opcode = opcode;
+	admin_cmd.cdw12 = cdw12;
 	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
 	if (ret != 0) {
 		fprintf(stdout, "ERROR : Crash dump erase failed\n");
 	}
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
-
 	return ret;
 }
 
@@ -216,12 +224,39 @@ static __u32 wdc_crash_dump_length(int fd, __u32 *crash_dump_length)
 	return ret;
 }
 
-static int wdc_do_crash_dump(int fd, char *file, int clear)
+static int wdc_do_dump(int fd, __u32 opcode,__u32 data_len, __u32 cdw10,
+		__u32 cdw12, __u32 dump_length, char *file)
 {
 	int ret;
-	__u8 *crash_dump_data;
-	__u32 crash_dump_length;
+	__u8 *dump_data;
 	struct nvme_admin_cmd admin_cmd;
+
+	dump_data = (__u8 *) malloc(sizeof (__u8) * dump_length);
+	if (dump_data == NULL) {
+		fprintf(stderr, "ERROR : malloc : %s\n", strerror(errno));
+		return -1;
+	}
+	memset(dump_data, 0, sizeof (__u8) * dump_length);
+	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
+	admin_cmd.opcode = opcode;
+	admin_cmd.addr = (__u64) dump_data;
+	admin_cmd.data_len = data_len;
+	admin_cmd.cdw10 = dump_length;
+	admin_cmd.cdw12 = cdw12;
+
+	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	if (ret == 0) {
+		ret = wdc_create_log_file(file, dump_data, dump_length);
+	}
+	free(dump_data);
+	return ret;
+}
+
+static int wdc_do_crash_dump(int fd, char *file)
+{
+	int ret;
+	__u32 crash_dump_length;
 
 	ret = wdc_crash_dump_length(fd, &crash_dump_length);
 	if (ret == -1) {
@@ -230,28 +265,11 @@ static int wdc_do_crash_dump(int fd, char *file, int clear)
 	if (crash_dump_length == 0) {
 		fprintf(stderr, "Crash dump is empty\n");
 	} else {
-		crash_dump_data = (__u8 *) malloc(sizeof (__u8) * crash_dump_length);
-		if (crash_dump_data == NULL) {
-			fprintf(stderr, "ERROR : malloc : %s\n", strerror(errno));
-			return -1;
-		}
-		memset(crash_dump_data, 0, sizeof (__u8) * crash_dump_length);
-		memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
-		admin_cmd.opcode = WDC_NVME_CRASH_DUMP_OPCODE;
-		admin_cmd.addr = (__u64) crash_dump_data;
-		admin_cmd.data_len = crash_dump_length;
-		admin_cmd.cdw10 = crash_dump_length;
-		admin_cmd.cdw12 = ((WDC_NVME_CRASH_DUMP_SUBCMD <<
-				WDC_NVME_SUBCMD_SHIFT) | WDC_NVME_CRASH_DUMP_CMD);
-
-		ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
-		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
-		if (ret == 0) {
-			ret = wdc_create_log_file(file, crash_dump_data, crash_dump_length);
-		}
-		free(crash_dump_data);
+		ret = wdc_do_dump(fd, WDC_NVME_CRASH_DUMP_OPCODE, crash_dump_length,
+				crash_dump_length,
+				(WDC_NVME_CRASH_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
+				 WDC_NVME_CRASH_DUMP_CMD, crash_dump_length, file);
 	}
-
 	return ret;
 }
 
@@ -263,6 +281,9 @@ static int wdc_crash_dump(int argc, char **argv, struct command *command,
 	char *clear = "Erases the Crash Dump.";
 	char f[0x100];
 	int fd;
+	__u8 opcode = WDC_NVME_CLEAR_DUMP_OPCODE;
+	__u32 cdw12 = ((WDC_NVME_CLEAR_CRASH_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
+			WDC_NVME_CLEAR_CRASH_DUMP_CMD);
 	struct config {
 		char *file;
 		int clear;
@@ -270,6 +291,7 @@ static int wdc_crash_dump(int argc, char **argv, struct command *command,
 
 	struct config cfg = {
 		.file = NULL,
+		.clear = 0
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
@@ -282,7 +304,7 @@ static int wdc_crash_dump(int argc, char **argv, struct command *command,
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
 
 	if (cfg.clear == 1) {
-		return wdc_do_clear_crash_dump(fd, file);
+		return wdc_do_clear_dump(fd, opcode, cdw12);
 	}
 
 	if (cfg.file == NULL) {
@@ -292,7 +314,7 @@ static int wdc_crash_dump(int argc, char **argv, struct command *command,
 			return -1;
 		}
 	}
-	return wdc_do_crash_dump(fd, cfg.file, cfg.clear);
+	return wdc_do_crash_dump(fd, cfg.file);
 }
 
 static __u32 wdc_drive_log_length(int fd, __u32 *drive_log_length)
@@ -396,6 +418,97 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 	return wdc_do_drive_log(fd, cfg.file);
 }
 
+static __u32 wdc_pfail_dump_length(int fd, __u32 *pfail_dump_length)
+{
+	int ret;
+	__u8 buf[WDC_NVME_PFAIL_DUMP_SIZE_DATA_LEN];
+	struct wdc_log_size *l;
+	struct nvme_admin_cmd admin_cmd;
+
+	l = (struct wdc_log_size *) buf;
+	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
+	admin_cmd.opcode = WDC_NVME_PFAIL_DUMP_SIZE_OPCODE;
+	admin_cmd.addr = (__u64) buf;
+	admin_cmd.data_len = WDC_NVME_PFAIL_DUMP_SIZE_DATA_LEN;
+	admin_cmd.cdw10 = WDC_NVME_PFAIL_DUMP_SIZE_NDT;
+	admin_cmd.cdw12 = ((WDC_NVME_PFAIL_DUMP_SIZE_SUBCMD <<
+				WDC_NVME_SUBCMD_SHIFT) | WDC_NVME_PFAIL_DUMP_SIZE_CMD);
+
+	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+	if (ret != 0) {
+		l->log_size = 0;
+		ret = -1;
+		fprintf(stderr, "ERROR : reading pfail dump length failed\n");
+		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	}
+
+	*pfail_dump_length = l->log_size;
+	return ret;
+}
+
+static int wdc_do_pfail_dump(int fd, char *file)
+{
+	int ret;
+	__u32 pfail_dump_length;
+
+	ret = wdc_pfail_dump_length(fd, &pfail_dump_length);
+	if (ret == -1) {
+		fprintf(stderr, "ERROR : failed to get the length of drive log\n");
+		return -1;
+	}
+	if (pfail_dump_length == 0) {
+		fprintf(stderr, "PFail dump is empty\n");
+	} else {
+		ret = wdc_do_dump(fd, WDC_NVME_PFAIL_DUMP_OPCODE, pfail_dump_length,
+				pfail_dump_length,
+				(WDC_NVME_PFAIL_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
+				 WDC_NVME_PFAIL_DUMP_CMD, pfail_dump_length, file);
+	}
+	return ret;
+}
+
+static int wdc_pfail_dump(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	char *desc = "Power Fail Dump.";
+	char *file = "Output file pathname.";
+	char *clear = "Erases the pfail crash dump.";
+	char f[0x100];
+	int fd;
+	__u8 opcode = WDC_NVME_CLEAR_DUMP_OPCODE;
+	__u32 cdw12 = WDC_NVME_CLEAR_PFAIL_DUMP_CMD;
+	struct config {
+		char *file;
+		int clear;
+	};
+
+	struct config cfg = {
+		.file = NULL,
+		.clear = 0
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
+		{"clear", 'c', CFG_NONE, CFG_NONE, &cfg.clear, no_argument, clear},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+		{0}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+
+	if (cfg.clear == 1) {
+		return wdc_do_clear_dump(fd, opcode, cdw12);
+	}
+
+	if (cfg.file == NULL) {
+		cfg.file = f;
+		if (wdc_get_serial_name(fd, cfg.file) == -1) {
+			fprintf(stderr, "ERROR : failed to generate file name\n");
+			return -1;
+		}
+	}
+	return wdc_do_pfail_dump(fd, cfg.file);
+}
 static const char* wdc_purge_mon_status_to_string(__u32 status)
 {
 	const char *str;
