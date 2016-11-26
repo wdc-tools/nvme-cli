@@ -3,7 +3,7 @@ nvme-wdc-crash-dump(1)
 
 NAME
 ----
-nvme-wdc-crash-dump - Retrieve hgst device's crash dump and save to file.
+nvme-wdc-crash-dump - Retrieve WDC device's crash dump and save to file.
 
 SYNOPSIS
 --------

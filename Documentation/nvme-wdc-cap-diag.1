@@ -1,5 +1,5 @@
 '\" t
-.\"     Title: nvme-wdc-pfail-dump
+.\"     Title: nvme-wdc-cap-diag
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
 .\"      Date: 11/25/2016
@@ -7,7 +7,7 @@
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-PFAIL\-DU" "1" "11/25/2016" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-CAP\-DIAG" "1" "11/25/2016" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,30 +28,24 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-nvme-wdc-pfail-dump \- Retrieve WDC device\*(Aqs pfail dump and save to file\&.
+nvme-wdc-cap-diag \- Retrieve WDC device\*(Aqs diagnostic log and save to file\&.
 .SH "SYNOPSIS"
 .sp
 .nf
-\fInvme wdc pfail\-dump\fR <device> [\-\-output\-file=<FILE>, \-o <FILE>]
-                        [\-\-clear, \-c]
+\fInvme wdc cap\-diag\fR <device> [\-\-outout\-file=<FILE>, \-o <FILE>]
 .fi
 .SH "DESCRIPTION"
 .sp
-For the NVMe device given, sends the WDC vendor unique pfail dump request and saves the result to a file\&.
+For the NVMe device given, sends the WDC Vendor Unique Capture\-Diagnostics request and saves the result to an archive file\&. The NVMe device must refer to a single physical device (namespaces are not supported)\&. By default it will save archive in the current directory of the program being executed\&. In absence of pathname it will create a file with Serial Number of the given NVMe device\&.
 .sp
-The <device> parameter is mandatory NVMe character device (ex: /dev/nvme0)\&.
+This will only work on WDC devices supporting this feature\&. Results for any other device are undefined\&.
 .sp
-This will only work on WDC devices\&. Results for any other device are undefined\&.
+The <device> parameter is NVMe character device (ex: /dev/nvme0) and it is mandatory\&.
 .SH "OPTIONS"
 .PP
 \-o <FILE>, \-\-output\-file=<FILE>
 .RS 4
 Output file; defaults to device serial number
-.RE
-.PP
-\-c, \-\-clear
-.RS 4
-Clear pfail log
 .RE
 .SH "EXAMPLES"
 .sp
@@ -63,13 +57,13 @@ Clear pfail log
 .sp -1
 .IP \(bu 2.3
 .\}
-Gets the pfail dump from the device and saves to default file:
+Gets the capture diagnostics log from the device and saves to default file:
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-# nvme wdc pfail\-dump /dev/nvme0
+# nvme wdc cap\-diag /dev/nvme0
 .fi
 .if n \{\
 .RE
@@ -84,55 +78,13 @@ Gets the pfail dump from the device and saves to default file:
 .sp -1
 .IP \(bu 2.3
 .\}
-Gets the pfail dump from the device, saves to default file and clears it:
+Gets the capture disgnostics log from the device and saves to defined file:
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-# nvme wdc pfail\-dump /dev/nvme0 \-c
-.fi
-.if n \{\
-.RE
-.\}
-.RE
-.sp
-.RS 4
-.ie n \{\
-\h'-04'\(bu\h'+03'\c
-.\}
-.el \{\
-.sp -1
-.IP \(bu 2.3
-.\}
-Gets the pfail dump from the device and saves to defined file:
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-# nvme wdc pfail\-dump /dev/nvme0 \-o GF1\-pfail\-dump
-.fi
-.if n \{\
-.RE
-.\}
-.RE
-.sp
-.RS 4
-.ie n \{\
-\h'-04'\(bu\h'+03'\c
-.\}
-.el \{\
-.sp -1
-.IP \(bu 2.3
-.\}
-Clears the pfail dump:
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-# nvme wdc pfail\-dump /dev/nvme0 \-\-clear
+# nvme wdc cap\-diag /dev/nvme0 \-o cap\-diag
 .fi
 .if n \{\
 .RE
@@ -140,4 +92,4 @@ Clears the pfail dump:
 .RE
 .SH "NVME"
 .sp
-Part of the nvme\-user suite
+Part of the nvme\-user suite\&.

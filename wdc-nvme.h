@@ -8,9 +8,10 @@
 
 PLUGIN(NAME("wdc", "Western Digital vendor specific extensions"),
 	COMMAND_LIST(
+		ENTRY("cap-diag", "WDC Capture-Diagnostics", wdc_cap_diag)
 		ENTRY("crash-dump", "WDC Crash Dump", wdc_crash_dump)
 		ENTRY("drive-log", "WDC Drive Log", wdc_drive_log)
-		ENTRY("pfail-dump", "WDC pfail dump", wdc_pfail_dump)
+		ENTRY("pfail-dump", "WDC Pfail Dump", wdc_pfail_dump)
 		ENTRY("purge", "WDC Purge", wdc_purge)
 		ENTRY("purge-monitor", "WDC Purge Monitor", wdc_purge_monitor)
 	)
