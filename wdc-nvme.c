@@ -281,7 +281,6 @@ static int wdc_do_cap_diag(int fd, char *file)
 	if (ret == -1) {
 		return -1;
 	}
-	printf("cap_diag_length %u\n", cap_diag_length);
 	if (cap_diag_length == 0) {
 		fprintf(stderr, "Capture Dignostics log is empty\n");
 	} else {
