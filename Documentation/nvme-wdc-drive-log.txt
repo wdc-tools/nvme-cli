@@ -26,20 +26,25 @@ OPTIONS
 -------
 -o <FILE>::
 --output-file=<FILE>::
-	Output file; defaults to device serial number
+	Output file; defaults to device serial number followed by "drive_log" suffix
 
 
 EXAMPLES
 --------
-* Gets the drive log from the device and saves to default file :
+* Gets the drive log from the device and saves to default file in current directory (e.g. STM00019F3F9drive_log.bin):
 +
 ------------
 # nvme wdc drive-log /dev/nvme0
 ------------
-* Gets the drive log from the device and saves to defined file :
+* Gets the drive log from the device and saves to defined file in current directory (e.g. testSTM00019F3F9drive_log.bin):
 +
 ------------
-# nvme wdc drive-log /dev/nvme0 -o wdc_drive_log
+# nvme wdc drive-log /dev/nvme0 -o test
+------------
+* Gets the drive log from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9drive_log.bin):
++
+------------
+# nvme wdc drive-log /dev/nvme0 -o /tmp/test
 ------------
 
 NVME

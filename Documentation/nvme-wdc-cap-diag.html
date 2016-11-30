@@ -746,7 +746,7 @@ nvme-wdc-cap-diag(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>nvme wdc cap-diag</em> &lt;device&gt; [--outout-file=&lt;FILE&gt;, -o &lt;FILE&gt;]</pre>
+<pre class="content"><em>nvme wdc cap-diag</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]</pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -755,15 +755,12 @@ nvme-wdc-cap-diag(1) Manual Page
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
 <div class="paragraph"><p>For the NVMe device given, sends the WDC Vendor Unique Capture-Diagnostics
-request and saves the result to an archive file. The NVMe device
-must refer to a single physical device (namespaces are not supported).
-By default it will save archive in the current directory of the program being
-executed. In absence of pathname it will create a file with Serial Number of
-the given NVMe device.</p></div>
+request and saves the result to a file.</p></div>
+<div class="paragraph"><p>The &lt;device&gt; parameter is mandatory NVMe character device (ex: /dev/nvme0).</p></div>
 <div class="paragraph"><p>This will only work on WDC devices supporting this feature.
 Results for any other device are undefined.</p></div>
-<div class="paragraph"><p>The &lt;device&gt; parameter is NVMe character device (ex: /dev/nvme0) and
-it is mandatory.</p></div>
+<div class="paragraph"><p>This will only work on WDC devices which are capable of generating capture
+diagnostics log. Results for any other device are undefined.</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -778,7 +775,7 @@ it is mandatory.</p></div>
 </dt>
 <dd>
 <p>
-        Output file; defaults to device serial number
+        Output file; defaults to device serial number followed by "cap_diag" suffix
 </p>
 </dd>
 </dl></div>
@@ -790,7 +787,7 @@ it is mandatory.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-Gets the capture diagnostics log from the device and saves to default file:
+Gets the capture diagnostics log from the device and saves to default file in current directory (e.g. STM00019F3F9cap_diag.bin):
 </p>
 <div class="listingblock">
 <div class="content">
@@ -799,11 +796,20 @@ Gets the capture diagnostics log from the device and saves to default file:
 </li>
 <li>
 <p>
-Gets the capture disgnostics log from the device and saves to defined file:
+Gets the capture diagnostics log from the device and saves to defined file in current directory (e.g. testSTM00019F3F9cap_diag.bin):
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc cap-diag /dev/nvme0 -o cap-diag</code></pre>
+<pre><code># nvme wdc cap-diag /dev/nvme0 -o test</code></pre>
+</div></div>
+</li>
+<li>
+<p>
+Gets the capture diagnostics log from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9cap_diag.bin):
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><code># nvme wdc cap-diag /dev/nvme0 -o /tmp/test</code></pre>
 </div></div>
 </li>
 </ul></div>
@@ -819,7 +825,7 @@ Gets the capture disgnostics log from the device and saves to defined file:
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-25 23:29:02 PST
+Last updated 2016-11-29 17:19:30 PST
 </div>
 </div>
 </body>

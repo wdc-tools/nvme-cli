@@ -775,7 +775,7 @@ undefined.</p></div>
 </dt>
 <dd>
 <p>
-        Output file; defaults to device serial number
+        Output file; defaults to device serial number followed by "drive_log" suffix
 </p>
 </dd>
 </dl></div>
@@ -787,7 +787,7 @@ undefined.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-Gets the drive log from the device and saves to default file :
+Gets the drive log from the device and saves to default file in current directory (e.g. STM00019F3F9drive_log.bin):
 </p>
 <div class="listingblock">
 <div class="content">
@@ -796,11 +796,20 @@ Gets the drive log from the device and saves to default file :
 </li>
 <li>
 <p>
-Gets the drive log from the device and saves to defined file :
+Gets the drive log from the device and saves to defined file in current directory (e.g. testSTM00019F3F9drive_log.bin):
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc drive-log /dev/nvme0 -o wdc_drive_log</code></pre>
+<pre><code># nvme wdc drive-log /dev/nvme0 -o test</code></pre>
+</div></div>
+</li>
+<li>
+<p>
+Gets the drive log from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9drive_log.bin):
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><code># nvme wdc drive-log /dev/nvme0 -o /tmp/test</code></pre>
 </div></div>
 </li>
 </ul></div>
@@ -816,7 +825,7 @@ Gets the drive log from the device and saves to defined file :
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-22 19:22:03 PST
+Last updated 2016-11-29 16:46:43 PST
 </div>
 </div>
 </body>
