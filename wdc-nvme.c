@@ -94,11 +94,9 @@ static int wdc_do_clear_dump(int fd, __u8 opcode, __u32 cdw12);
 static int wdc_do_dump(int fd, __u32 opcode,__u32 data_len, __u32 cdw10,
 		__u32 cdw12, __u32 dump_length, char *file);
 static int wdc_do_crash_dump(int fd, char *file);
-static int wdc_crash_dump(int argc, char **argv, struct command *command,
-		struct plugin *plugin);
+static int wdc_crash_dump(int fd, char *file);
 static int wdc_do_pfail_dump(int fd, char *file);
-static int wdc_pfail_dump(int argc, char **argv, struct command *command,
-		struct plugin *plugin);
+static int wdc_pfail_dump(int fd, char *file);
 static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 static int wdc_do_drive_log(int fd, char *file);
@@ -234,13 +232,12 @@ static __u32 wdc_dump_length(int fd, __u32 opcode, __u32 cdw10, __u32 cdw12, __u
 		ret = -1;
 		fprintf(stderr, "ERROR : reading dump length failed\n");
 		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
-	}
-
-	if (opcode == WDC_NVME_CAP_DIAG_OPCODE) {
-		*dump_length = buf[0x04] << 24 | buf[0x05] << 16 | buf[0x06] << 8 | buf[0x07];
 	} else {
-		*dump_length = l->log_size;
+		if (opcode == WDC_NVME_CAP_DIAG_OPCODE) {
+			l->log_size = buf[0x04] << 24 | buf[0x05] << 16 | buf[0x06] << 8 | buf[0x07];
+		}
 	}
+	*dump_length = l->log_size;
 	return ret;
 }
 
@@ -359,32 +356,12 @@ static int wdc_do_crash_dump(int fd, char *file)
 	return ret;
 }
 
-static int wdc_crash_dump(int argc, char **argv, struct command *command,
-		struct plugin *plugin)
+static int wdc_crash_dump(int fd, char *file)
 {
-	char *desc = "Crash Dump.";
-	char *file = "Output file pathname.";
 	char f[PATH_MAX] = {0};
-	int fd;
-	struct config {
-		char *file;
-		int clear;
-	};
 
-	struct config cfg = {
-		.file = NULL,
-		.clear = 0
-	};
-
-	const struct argconfig_commandline_options command_line_options[] = {
-		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
-		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
-		{0}
-	};
-
-	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if (cfg.file != NULL) {
-		strncpy(f, cfg.file, PATH_MAX);
+	if (file != NULL) {
+		strncpy(f, file, PATH_MAX);
 	}
 	if (wdc_get_serial_name(fd, f, PATH_MAX, "crash_dump") == -1) {
 		fprintf(stderr, "ERROR : failed to generate file name\n");
@@ -496,34 +473,12 @@ static int wdc_do_pfail_dump(int fd, char *file)
 	return ret;
 }
 
-static int wdc_pfail_dump(int argc, char **argv, struct command *command,
-		struct plugin *plugin)
+static int wdc_pfail_dump(int fd, char *file)
 {
-	char *desc = "Power Fail Dump.";
-	char *file = "Output file pathname.";
-	char *clear = "Erases the pfail crash dump.";
 	char f[PATH_MAX] = {0};
-	int fd;
-	struct config {
-		char *file;
-		int clear;
-	};
 
-	struct config cfg = {
-		.file = NULL,
-		.clear = 0
-	};
-
-	const struct argconfig_commandline_options command_line_options[] = {
-		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
-		{"clear", 'c', NULL, CFG_NONE, &cfg.clear, no_argument, clear},
-		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
-		{0}
-	};
-
-	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if (cfg.file != NULL) {
-		strncpy(f, cfg.file, PATH_MAX);
+	if (file != NULL) {
+		strncpy(f, file, PATH_MAX);
 	}
 	if (wdc_get_serial_name(fd, f, PATH_MAX, "pfail_dump") == -1) {
 		fprintf(stderr, "ERROR : failed to generate file name\n");
@@ -535,13 +490,31 @@ static int wdc_pfail_dump(int argc, char **argv, struct command *command,
 static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
+	char *desc = "Get Crash Dump.";
+	char *file = "Output file pathname.";
+	int fd;
 	int ret;
+	struct config {
+		char *file;
+	};
 
-	ret = wdc_crash_dump(argc, argv, command, plugin);
+	struct config cfg = {
+		.file = NULL,
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+		{0}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+
+	ret = wdc_crash_dump(fd, cfg.file);
 	if (ret != 0) {
 		fprintf(stderr, "ERROR : failed to read crash dump\n");
 	}
-	ret = wdc_pfail_dump(argc, argv, command, plugin);
+	ret = wdc_pfail_dump(fd, cfg.file);
 	if (ret != 0) {
 		fprintf(stderr, "ERROR : failed to read crash dump\n");
 	}
