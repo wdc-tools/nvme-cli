@@ -20,6 +20,12 @@
 #define CREATE_CMD
 #include "wdc-nvme.h"
 
+#define safe_div_fp(numerator, denominator) \
+	(denominator ? ((double)numerator/(double)denominator) : 0)
+
+#define calc_percent(numerator, denominator) \
+	(denominator ? (uint64_t)(((double)numerator/(double)denominator)*100) : 0)
+
 #define WRITE_SIZE	(sizeof(__u8) * 4096)
 
 #define WDC_NVME_SUBCMD_SHIFT	8
@@ -93,6 +99,11 @@
 #define WDC_NVME_CLEAR_PFAIL_DUMP_CMD		0x03
 #define WDC_NVME_CLEAR_PFAIL_DUMP_SUBCMD	0x06
 
+/* Additional Smart Log */
+#define WDC_ADD_LOG_BUF_LEN							0x100000
+#define WDC_NVME_ADD_LOG_OPCODE						0xC1
+#define WDC_GET_LOG_PAGE_SSD_PERFORMANCE			0x37
+#define WDC_NVME_GET_STAT_PERF_INTERVAL_LIFETIME	0x0F
 static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix);
 static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 		__u32 drive_log_length);
@@ -134,6 +145,39 @@ struct wdc_nvme_purge_monitor_data {
 	__u8			rsvd6[14];
 };
 
+/* Additional Smart Log */
+struct wdc_log_page_header
+{
+	uint8_t		num_subpages;
+	uint8_t		reserved;
+	uint16_t	total_log_size;
+};
+
+struct wdc_log_page_subpage_header
+{
+	uint8_t		spcode;
+	uint8_t		pcset;
+	uint16_t	subpage_length;
+};
+
+struct wdc_ssd_perf_stats
+{
+	uint64_t	hr_cmds;		/* Host Read Commands				*/
+	uint64_t	hr_blks;		/* Host Read Blocks					*/
+	uint64_t	hr_ch_cmds;		/* Host Read Cache Hit Commands		*/
+	uint64_t	hr_ch_blks;		/* Host Read Cache Hit Blocks		*/
+	uint64_t	hr_st_cmds;		/* Host Read Stalled Commands		*/
+	uint64_t	hw_cmds;		/* Host Write Commands				*/
+	uint64_t	hw_blks;		/* Host Write Blocks				*/
+	uint64_t	hw_os_cmds;		/* Host Write Odd Start Commands	*/
+	uint64_t	hw_oe_cmds;		/* Host Write Odd End Commands		*/
+	uint64_t	hw_st_cmds;		/* Host Write Commands Stalled		*/
+	uint64_t	nr_cmds;		/* NAND Read Commands				*/
+	uint64_t	nr_blks;		/* NAND Read Blocks					*/
+	uint64_t	nw_cmds;		/* NAND Write Commands				*/
+	uint64_t	nw_blks;		/* NAND Write Blocks				*/
+	uint64_t	nrbw;			/* NAND Read Before Write			*/
+};
 
 static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix)
 {
@@ -650,3 +694,134 @@ static int wdc_purge_monitor(int argc, char **argv,
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
 	return ret;
 }
+
+static int wdc_print_log(struct wdc_ssd_perf_stats *perf)
+{
+	if (!perf) {
+		fprintf(stderr, "Invalid buffer to read perf stats\n");
+		return -1;
+	}
+	printf("  Performance Statistics :- \n");
+	printf("  Host Read Commands                             %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hr_cmds));
+	printf("  Host Read Blocks                               %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hr_blks));
+	printf("  Average Read Size                              %20lf\n",
+			safe_div_fp((le64_to_cpu(perf->hr_blks)), (le64_to_cpu(perf->hr_cmds))));
+	printf("  Host Read Cache Hit Commands                   %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hr_ch_cmds));
+	printf("  Host Read Cache Hit_Percentage                 %20"PRIu64"%%\n",
+			(uint64_t) calc_percent(le64_to_cpu(perf->hr_ch_cmds), le64_to_cpu(perf->hr_cmds)));
+	printf("  Host Read Cache Hit Blocks                     %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hr_ch_blks));
+	printf("  Average Read Cache Hit Size                    %20f\n",
+			safe_div_fp((le64_to_cpu(perf->hr_ch_blks)), (le64_to_cpu(perf->hr_ch_cmds))));
+	printf("  Host Read Commands Stalled                     %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hr_st_cmds));
+	printf("  Host Read Commands Stalled Percentage          %20"PRIu64"%%\n",
+			(uint64_t)calc_percent((le64_to_cpu(perf->hr_st_cmds)), le64_to_cpu(perf->hr_cmds)));
+	printf("  Host Write Commands                            %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hw_cmds));
+	printf("  Host Write Blocks                              %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hw_blks));
+	printf("  Average Write Size                             %20f\n",
+			safe_div_fp((le64_to_cpu(perf->hw_blks)), (le64_to_cpu(perf->hw_cmds))));
+	printf("  Host Write Odd Start Commands                  %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hw_os_cmds));
+	printf("  Host Write Odd Start Commands Percentage       %20"PRIu64"%%\n",
+			(uint64_t)calc_percent((le64_to_cpu(perf->hw_os_cmds)), (le64_to_cpu(perf->hw_cmds))));
+	printf("  Host Write Odd End Commands                    %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hw_oe_cmds));
+	printf("  Host Write Odd End Commands Percentage         %20"PRIu64"%%\n",
+			(uint64_t)calc_percent((le64_to_cpu(perf->hw_oe_cmds)), (le64_to_cpu((perf->hw_cmds)))));
+	printf("  Host Write Commands Stalled                    %20"PRIu64"%%\n",
+		(uint64_t)le64_to_cpu(perf->hr_st_cmds));
+	printf("  Host Write Commands Stalled Percentage         %20"PRIu64"%%\n",
+		(uint64_t)calc_percent((le64_to_cpu(perf->hw_st_cmds)), (le64_to_cpu(perf->hw_cmds))));
+	printf("  NAND Read Commands                             %20"PRIu64"\n",
+		(uint64_t)le64_to_cpu(perf->nr_cmds));
+	printf("  NAND Read Blocks Commands                      %20"PRIu64"\n",
+		(uint64_t)le64_to_cpu(perf->nr_blks));
+	printf("  Average NAND Read Size                         %20f\n",
+		safe_div_fp((le64_to_cpu(perf->nr_blks)), (le64_to_cpu((perf->nr_cmds)))));
+	printf("  Host Write Odd Start Commands                  %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->hw_os_cmds));
+	printf("  Nand Write Commands                            %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->nw_cmds));
+	printf("  NAND Write Blocks                              %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->nw_blks));
+	printf("  Average NAND Write Size                        %20f\n",
+			safe_div_fp((le64_to_cpu(perf->nw_blks)), (le64_to_cpu(perf->nw_cmds))));
+	printf("  NAND Read Before Write                         %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->nrbw));
+	return 0;
+}
+
+static int wdc_smart_log_add(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	char *desc = "Retrieve additional performance statistics.";
+	char *interval = "Interval to read the statistics from [1, 15].";
+	uint8_t *p;
+	int i;
+	int fd;
+	int ret;
+	int skip_cnt = 4;
+	int total_subpages;
+	__u8 *data;
+	struct wdc_log_page_header *l;
+	struct wdc_log_page_subpage_header *sph;
+	struct wdc_ssd_perf_stats *perf;
+
+	struct config {
+		uint8_t interval;
+	};
+
+	struct config cfg = {
+		.interval = 14
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"interval", 'i', "NUM", CFG_POSITIVE, &cfg.interval, required_argument, interval},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+		{0}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+
+	if (cfg.interval < 1 || cfg.interval > 15) {
+		fprintf(stderr, "ERROR : interval out of range [1-15]\n");
+		return -1;
+	}
+
+	if ((data = (__u8*) malloc(sizeof (__u8) * WDC_ADD_LOG_BUF_LEN)) == NULL) {
+		fprintf(stderr, "ERROR : malloc : %s\n", strerror(errno));
+		return -1;
+	}
+	memset(data, 0, sizeof (__u8) * WDC_ADD_LOG_BUF_LEN);
+
+	ret = nvme_get_log(fd, 0x01, WDC_NVME_ADD_LOG_OPCODE, WDC_ADD_LOG_BUF_LEN, data);
+	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	if (ret == 0) {
+		l = (struct wdc_log_page_header*)data;
+		total_subpages = l->num_subpages + WDC_NVME_GET_STAT_PERF_INTERVAL_LIFETIME - 1;
+		for (i = 0, p = data + skip_cnt; i < total_subpages; i++, p += skip_cnt) {
+			sph = (struct wdc_log_page_subpage_header *) p;
+			if (sph->spcode == WDC_GET_LOG_PAGE_SSD_PERFORMANCE) {
+				if (sph->pcset == cfg.interval) {
+					perf = (struct wdc_ssd_perf_stats *) (p + 4);
+					ret = wdc_print_log(perf);
+					break;
+				}
+			}
+			skip_cnt = sph->subpage_length + 4;
+		}
+		if (ret) {
+			fprintf(stderr, "ERROR : Unable to read data from buffer\n");
+		}
+	}
+	free(data);
+	return ret;
+}
+
+

@@ -13,6 +13,7 @@ PLUGIN(NAME("wdc", "Western Digital vendor specific extensions"),
 		ENTRY("get-crash-dump", "WDC Crash Dump", wdc_get_crash_dump)
 		ENTRY("purge", "WDC Purge", wdc_purge)
 		ENTRY("purge-monitor", "WDC Purge Monitor", wdc_purge_monitor)
+		ENTRY("smart-log-add", "WDC Additional Smart Log", wdc_smart_log_add)
 	)
 );
 
