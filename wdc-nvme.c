@@ -86,6 +86,7 @@
 #define WDC_NVME_CLEAR_CRASH_DUMP_CMD		0x03
 #define WDC_NVME_CLEAR_CRASH_DUMP_SUBCMD	0x05
 #define WDC_NVME_CLEAR_PFAIL_DUMP_CMD		0x03
+#define WDC_NVME_CLEAR_PFAIL_DUMP_SUBCMD	0x06
 
 static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix);
 static int wdc_create_log_file(char *file, __u8 *drive_log_data,
@@ -448,7 +449,8 @@ static int wdc_do_pfail_dump(int fd, char *file)
 	int ret;
 	__u32 pfail_dump_length;
 	__u8 opcode = WDC_NVME_CLEAR_DUMP_OPCODE;
-	__u32 cdw12 = WDC_NVME_CLEAR_PFAIL_DUMP_CMD;
+	__u32 cdw12 = ((WDC_NVME_CLEAR_PFAIL_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
+			WDC_NVME_CLEAR_PFAIL_DUMP_CMD);
 
 	ret = wdc_dump_length(fd,WDC_NVME_PFAIL_DUMP_SIZE_OPCODE,
 			WDC_NVME_PFAIL_DUMP_SIZE_NDT,
