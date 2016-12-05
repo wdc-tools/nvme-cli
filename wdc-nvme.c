@@ -823,5 +823,3 @@ static int wdc_smart_log_add(int argc, char **argv, struct command *command,
 	free(data);
 	return ret;
 }
-
-
