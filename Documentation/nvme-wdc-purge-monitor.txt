@@ -31,7 +31,7 @@ Expected status and description :-
 |Purge State Busy.
 
 |0x03
-|Purge State Error : Purge operation resulted in error, power cyale required.
+|Purge State Error : Purge operation resulted in error, power cycle required.
 
 |0x04
 |Purge State Error : Purge operation interrupted by power cycle or reset.
