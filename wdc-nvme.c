@@ -734,7 +734,7 @@ static int wdc_print_log(struct wdc_ssd_perf_stats *perf)
 			(uint64_t)le64_to_cpu(perf->hw_oe_cmds));
 	printf("  Host Write Odd End Commands Percentage         %20"PRIu64"%%\n",
 			(uint64_t)calc_percent((le64_to_cpu(perf->hw_oe_cmds)), (le64_to_cpu((perf->hw_cmds)))));
-	printf("  Host Write Commands Stalled                    %20"PRIu64"%%\n",
+	printf("  Host Write Commands Stalled                    %20"PRIu64"\n",
 		(uint64_t)le64_to_cpu(perf->hr_st_cmds));
 	printf("  Host Write Commands Stalled Percentage         %20"PRIu64"%%\n",
 		(uint64_t)calc_percent((le64_to_cpu(perf->hw_st_cmds)), (le64_to_cpu(perf->hw_cmds))));
