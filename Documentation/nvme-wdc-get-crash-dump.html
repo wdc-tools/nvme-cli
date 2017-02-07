@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 8.6.8" />
+<meta name="generator" content="AsciiDoc 8.6.9" />
 <title>nvme-wdc-get-crash-dump(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -94,7 +94,9 @@ ul > li > * { color: black; }
   padding: 0;
   margin: 0;
 }
-
+pre {
+  white-space: pre-wrap;
+}
 
 #author {
   color: #527bbd;
@@ -223,7 +225,7 @@ div.exampleblock > div.content {
 }
 
 div.imageblock div.content { padding-left: 0; }
-span.image img { border-style: none; }
+span.image img { border-style: none; vertical-align: text-bottom; }
 a.image:visited { color: white; }
 
 dl {
@@ -737,7 +739,7 @@ nvme-wdc-get-crash-dump(1) Manual Page
 <h2>NAME</h2>
 <div class="sectionbody">
 <p>nvme-wdc-get-crash-dump -
-   Retrieve WDC device's crash dumps and save to files.
+   Retrieve WDC device's crash dump.
 </p>
 </div>
 </div>
@@ -755,10 +757,10 @@ nvme-wdc-get-crash-dump(1) Manual Page
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
 <div class="paragraph"><p>For the NVMe device given, sends the WDC vendor unique crash dump
-request and saves the result to file(s). In current implementation crash dump and
-pfail dump are captured if they are present. On success it will save the dump(s) in
-file(s) with appropriate suffix. Note that this command will clear the available
-dump(s) from the device on success.</p></div>
+request and saves the result to file. In current implementation crash dump is
+captured if it is present. On success it will save the dump in file with
+appropriate suffix. Note that this command will clear the available
+dump from the device on success.</p></div>
 <div class="paragraph"><p>The &lt;device&gt; parameter is mandatory NVMe character device (ex: /dev/nvme0).</p></div>
 <div class="paragraph"><p>This will only work on WDC devices. Results for any other device are
 undefined.</p></div>
@@ -776,7 +778,7 @@ undefined.</p></div>
 </dt>
 <dd>
 <p>
-        Output file; defaults to device serial number followed by "crash_dump" and "pfail_dump" suffix
+        Output file; defaults to device serial number followed by "crash_dump" suffix
 </p>
 </dd>
 </dl></div>
@@ -788,7 +790,7 @@ undefined.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-Gets the crash dump and pfail dump from the device and saves to default file(s) in current directory (e.g. STM00019F3F9crash_dump.bin &amp; STM00019F3F9pfail_dump.bin):
+Gets the crash dump from the device and saves to default file in current directory (e.g. STM00019F3F9crash_dump.bin):
 </p>
 <div class="listingblock">
 <div class="content">
@@ -797,7 +799,7 @@ Gets the crash dump and pfail dump from the device and saves to default file(s) 
 </li>
 <li>
 <p>
-Gets the crash dump and pfail dump from the device and saves to defined file(s) in current directory (e.g. testSTM00019F3F9crash_dump.bin &amp; testSTM00019F3F9pfail_dump.bin):
+Gets the crash dump from the device and saves to defined file in current directory (e.g. testSTM00019F3F9crash_dump.bin):
 </p>
 <div class="listingblock">
 <div class="content">
@@ -806,7 +808,7 @@ Gets the crash dump and pfail dump from the device and saves to defined file(s) 
 </li>
 <li>
 <p>
-Gets the crash dump and pfail dump from the device and saves to defined file(s) with pathname (e.g. /tmp/testSTM00019F3F9crash_dump.bin &amp; /tmp/testSTM00019F3F9pfail_dump.bin):
+Gets the crash dump from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9crash_dump.bin):
 </p>
 <div class="listingblock">
 <div class="content">
@@ -826,7 +828,7 @@ Gets the crash dump and pfail dump from the device and saves to defined file(s) 
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-29 17:21:38 PST
+Last updated 2017-02-06 16:51:31 PST
 </div>
 </div>
 </body>

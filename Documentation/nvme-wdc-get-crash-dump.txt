@@ -3,7 +3,7 @@ nvme-wdc-get-crash-dump(1)
 
 NAME
 ----
-nvme-wdc-get-crash-dump - Retrieve WDC device's crash dumps and save to files.
+nvme-wdc-get-crash-dump - Retrieve WDC device's crash dump.
 
 SYNOPSIS
 --------
@@ -13,10 +13,10 @@ SYNOPSIS
 DESCRIPTION
 -----------
 For the NVMe device given, sends the WDC vendor unique crash dump
-request and saves the result to file(s). In current implementation crash dump and
-pfail dump are captured if they are present. On success it will save the dump(s) in
-file(s) with appropriate suffix. Note that this command will clear the available
-dump(s) from the device on success.
+request and saves the result to file. In current implementation crash dump is
+captured if it is present. On success it will save the dump in file with
+appropriate suffix. Note that this command will clear the available
+dump from the device on success.
 
 The <device> parameter is mandatory NVMe character device (ex: /dev/nvme0).
 
@@ -27,21 +27,21 @@ OPTIONS
 -------
 -o <FILE>::
 --output-file=<FILE>::
-	Output file; defaults to device serial number followed by "crash_dump" and "pfail_dump" suffix 
+	Output file; defaults to device serial number followed by "crash_dump" suffix
 
 EXAMPLES
 --------
-* Gets the crash dump and pfail dump from the device and saves to default file(s) in current directory (e.g. STM00019F3F9crash_dump.bin & STM00019F3F9pfail_dump.bin):
+* Gets the crash dump from the device and saves to default file in current directory (e.g. STM00019F3F9crash_dump.bin):
 +
 ------------
 # nvme wdc get-crash-dump /dev/nvme0
 ------------
-* Gets the crash dump and pfail dump from the device and saves to defined file(s) in current directory (e.g. testSTM00019F3F9crash_dump.bin & testSTM00019F3F9pfail_dump.bin):
+* Gets the crash dump from the device and saves to defined file in current directory (e.g. testSTM00019F3F9crash_dump.bin):
 +
 ------------
 # nvme wdc get-crash-dump /dev/nvme0 -o test
 ------------
-* Gets the crash dump and pfail dump from the device and saves to defined file(s) with pathname (e.g. /tmp/testSTM00019F3F9crash_dump.bin & /tmp/testSTM00019F3F9pfail_dump.bin):
+* Gets the crash dump from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9crash_dump.bin):
 +
 ------------
 # nvme wdc get-crash-dump /dev/nvme0 -o /tmp/test
