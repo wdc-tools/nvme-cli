@@ -66,17 +66,6 @@
 #define WDC_NVME_LED_BEACON_DISABLE_CMD		0x08
 #define WDC_NVME_LED_BEACON_DISABLE_SUBCMD	0x00
 
-/* Pfail Crash dump */
-#define WDC_NVME_PFAIL_DUMP_SIZE_OPCODE		WDC_NVME_CAP_DIAG_CMD_OPCODE
-#define WDC_NVME_PFAIL_DUMP_SIZE_DATA_LEN	WDC_NVME_LOG_SIZE_DATA_LEN
-#define WDC_NVME_PFAIL_DUMP_SIZE_NDT		0x02
-#define WDC_NVME_PFAIL_DUMP_SIZE_CMD		0x20
-#define WDC_NVME_PFAIL_DUMP_SIZE_SUBCMD		0x05
-
-#define WDC_NVME_PFAIL_DUMP_OPCODE			WDC_NVME_CAP_DIAG_CMD_OPCODE
-#define WDC_NVME_PFAIL_DUMP_CMD				0x20
-#define WDC_NVME_PFAIL_DUMP_SUBCMD			0x06
-
 /* Purge and Purge Monitor */
 #define WDC_NVME_PURGE_CMD_OPCODE			0xDD
 #define WDC_NVME_PURGE_MONITOR_OPCODE		0xDE
@@ -96,8 +85,6 @@
 #define WDC_NVME_CLEAR_DUMP_OPCODE			0xFF
 #define WDC_NVME_CLEAR_CRASH_DUMP_CMD		0x03
 #define WDC_NVME_CLEAR_CRASH_DUMP_SUBCMD	0x05
-#define WDC_NVME_CLEAR_PFAIL_DUMP_CMD		0x03
-#define WDC_NVME_CLEAR_PFAIL_DUMP_SUBCMD	0x06
 
 /* Additional Smart Log */
 #define WDC_ADD_LOG_BUF_LEN							0x4000
@@ -112,8 +99,6 @@ static int wdc_do_dump(int fd, __u32 opcode,__u32 data_len, __u32 cdw10,
 		__u32 cdw12, __u32 dump_length, char *file);
 static int wdc_do_crash_dump(int fd, char *file);
 static int wdc_crash_dump(int fd, char *file);
-static int wdc_do_pfail_dump(int fd, char *file);
-static int wdc_pfail_dump(int fd, char *file);
 static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 static int wdc_do_drive_log(int fd, char *file);
@@ -509,51 +494,6 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 	return wdc_do_drive_log(fd, f);
 }
 
-static int wdc_do_pfail_dump(int fd, char *file)
-{
-	int ret;
-	__u32 pfail_dump_length;
-	__u8 opcode = WDC_NVME_CLEAR_DUMP_OPCODE;
-	__u32 cdw12 = ((WDC_NVME_CLEAR_PFAIL_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
-			WDC_NVME_CLEAR_PFAIL_DUMP_CMD);
-
-	ret = wdc_dump_length(fd,WDC_NVME_PFAIL_DUMP_SIZE_OPCODE,
-			WDC_NVME_PFAIL_DUMP_SIZE_NDT,
-			((WDC_NVME_PFAIL_DUMP_SIZE_SUBCMD <<
-			WDC_NVME_SUBCMD_SHIFT) | WDC_NVME_PFAIL_DUMP_SIZE_CMD),
-			&pfail_dump_length);
-	if (ret == -1) {
-		fprintf(stderr, "ERROR : failed to get the length of drive log\n");
-		return -1;
-	}
-	if (pfail_dump_length == 0) {
-		fprintf(stderr, "PFail dump is empty\n");
-	} else {
-		ret = wdc_do_dump(fd, WDC_NVME_PFAIL_DUMP_OPCODE, pfail_dump_length,
-				pfail_dump_length,
-				(WDC_NVME_PFAIL_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
-				 WDC_NVME_PFAIL_DUMP_CMD, pfail_dump_length, file);
-
-		if (ret == 0)
-			ret = wdc_do_clear_dump(fd, opcode, cdw12);
-	}
-	return ret;
-}
-
-static int wdc_pfail_dump(int fd, char *file)
-{
-	char f[PATH_MAX] = {0};
-
-	if (file != NULL) {
-		strncpy(f, file, PATH_MAX);
-	}
-	if (wdc_get_serial_name(fd, f, PATH_MAX, "pfail_dump") == -1) {
-		fprintf(stderr, "ERROR : failed to generate file name\n");
-		return -1;
-	}
-	return wdc_do_pfail_dump(fd, f);
-}
-
 static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
@@ -578,10 +518,6 @@ static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
 
 	ret = wdc_crash_dump(fd, cfg.file);
-	if (ret != 0) {
-		fprintf(stderr, "ERROR : failed to read crash dump\n");
-	}
-	ret = wdc_pfail_dump(fd, cfg.file);
 	if (ret != 0) {
 		fprintf(stderr, "ERROR : failed to read crash dump\n");
 	}
