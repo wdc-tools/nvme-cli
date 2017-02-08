@@ -13,6 +13,7 @@
 #include "nvme-print.h"
 #include "nvme-ioctl.h"
 #include "plugin.h"
+#include "json.h"
 
 #include "argconfig.h"
 #include "suffix.h"
@@ -522,6 +523,21 @@ static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 		fprintf(stderr, "ERROR : failed to read crash dump\n");
 	}
 	return ret;
+}
+
+static void wdc_do_id_ctrl(__u8 *vs)
+{
+	char vsn[24];
+	int base = 3072;
+	int vsn_start = 3081;
+
+	memcpy(vsn, &vs[vsn_start - base], sizeof(vsn));
+	printf("wdc vsn	: %s\n", vsn);
+}
+
+static int wdc_id_ctrl(int argc, char **argv, struct command *cmd, struct plugin *plugin)
+{
+	return __id_ctrl(argc, argv, cmd, plugin, wdc_do_id_ctrl);
 }
 
 static const char* wdc_purge_mon_status_to_string(__u32 status)

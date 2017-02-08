@@ -1339,6 +1339,18 @@ void json_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode)
 		json_array_add_value_object(psds, psd);
 	}
 
+	if (ctrl->vid == 0x1c58) {
+		char vsn[24] = {0};
+		int base = 3072;
+		int vsn_start = 3081;
+		struct json_array *wdc = json_create_array();
+		struct json_object *wdc_vsn = json_create_object();
+		json_object_add_value_array(root, "Western Digital Controller", wdc);
+
+		memcpy(vsn, &ctrl->vs[vsn_start - base], sizeof(vsn));
+		json_object_add_value_string(wdc_vsn, "wdc vsn", vsn);
+		json_array_add_value_object(wdc, wdc_vsn);
+	}
 	json_print_object(root, NULL);
 	printf("\n");
 }
