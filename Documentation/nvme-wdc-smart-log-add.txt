@@ -27,6 +27,12 @@ OPTIONS
 --interval=<NUM>::
 	Return the statistics from specific interval, defaults to 14
 
+-o <format>::
+--output-format=<format>::
+	Set the reporting format to 'human', or
+	'json'. Only one output format can be used at a time.
+	Default is human.
+
 Valid Interval values and description :-
 
 [cols="2*", frame="topbot", align="center", options="header"]

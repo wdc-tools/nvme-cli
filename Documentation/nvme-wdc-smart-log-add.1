@@ -2,12 +2,12 @@
 .\"     Title: nvme-wdc-smart-log-add
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 12/02/2016
+.\"      Date: 02/15/2017
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-SMART\-LO" "1" "12/02/2016" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-SMART\-LO" "1" "02/15/2017" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -46,6 +46,13 @@ On success it returns 0, error code otherwise\&.
 \-i <NUM>, \-\-interval=<NUM>
 .RS 4
 Return the statistics from specific interval, defaults to 14
+.RE
+.PP
+\-o <format>, \-\-output\-format=<format>
+.RS 4
+Set the reporting format to
+\fIhuman\fR, or
+\fIjson\fR\&. Only one output format can be used at a time\&. Default is human\&.
 .RE
 .sp
 Valid Interval values and description :\-

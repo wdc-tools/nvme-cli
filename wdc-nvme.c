@@ -110,6 +110,10 @@ static int wdc_purge(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
 static int wdc_purge_monitor(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
+enum {
+	WDC_HUMAN,
+	WDC_JSON,
+};
 
 /* Drive log data size */
 struct wdc_log_size {
@@ -647,12 +651,8 @@ static int wdc_purge_monitor(int argc, char **argv,
 	return ret;
 }
 
-static int wdc_print_log(struct wdc_ssd_perf_stats *perf)
+static void wdc_print_log_human(struct wdc_ssd_perf_stats *perf)
 {
-	if (!perf) {
-		fprintf(stderr, "Invalid buffer to read perf stats\n");
-		return -1;
-	}
 	printf("  Performance Statistics :- \n");
 	printf("  Host Read Commands                             %20"PRIu64"\n",
 			(uint64_t)le64_to_cpu(perf->hr_cmds));
@@ -706,7 +706,94 @@ static int wdc_print_log(struct wdc_ssd_perf_stats *perf)
 			safe_div_fp((le64_to_cpu(perf->nw_blks)), (le64_to_cpu(perf->nw_cmds))));
 	printf("  NAND Read Before Write                         %20"PRIu64"\n",
 			(uint64_t)le64_to_cpu(perf->nrbw));
+}
+
+static void wdc_print_log_json(struct wdc_ssd_perf_stats *perf)
+{
+	struct json_object *root;
+
+	root = json_create_object();
+	json_object_add_value_int(root, "Host Read Commands", le64_to_cpu(perf->hr_cmds));
+	json_object_add_value_int(root, "Host Read Blocks", le64_to_cpu(perf->hr_blks));
+	json_object_add_value_int(root, "Average Read Size",
+			safe_div_fp((le64_to_cpu(perf->hr_blks)), (le64_to_cpu(perf->hr_cmds))));
+	json_object_add_value_int(root, "Host Read Cache Hit Commands",
+			(uint64_t)le64_to_cpu(perf->hr_ch_cmds));
+	json_object_add_value_int(root, "Host Read Cache Hit Percentage",
+			(uint64_t) calc_percent(le64_to_cpu(perf->hr_ch_cmds), le64_to_cpu(perf->hr_cmds)));
+	json_object_add_value_int(root, "Host Read Cache Hit Blocks",
+			(uint64_t)le64_to_cpu(perf->hr_ch_blks));
+	json_object_add_value_int(root, "Average Read Cache Hit Size",
+			safe_div_fp((le64_to_cpu(perf->hr_ch_blks)), (le64_to_cpu(perf->hr_ch_cmds))));
+	json_object_add_value_int(root, "Host Read Commands Stalled",
+			(uint64_t)le64_to_cpu(perf->hr_st_cmds));
+	json_object_add_value_int(root, "Host Read Commands Stalled Percentage",
+			(uint64_t)calc_percent((le64_to_cpu(perf->hr_st_cmds)), le64_to_cpu(perf->hr_cmds)));
+	json_object_add_value_int(root, "Host Write Commands",
+			(uint64_t)le64_to_cpu(perf->hw_cmds));
+	json_object_add_value_int(root, "Host Write Blocks",
+			(uint64_t)le64_to_cpu(perf->hw_blks));
+	json_object_add_value_int(root, "Average Write Size",
+			safe_div_fp((le64_to_cpu(perf->hw_blks)), (le64_to_cpu(perf->hw_cmds))));
+	json_object_add_value_int(root, "Host Write Odd Start Commands",
+			(uint64_t)le64_to_cpu(perf->hw_os_cmds));
+	json_object_add_value_int(root, "Host Write Odd Start Commands Percentage",
+			(uint64_t)calc_percent((le64_to_cpu(perf->hw_os_cmds)), (le64_to_cpu(perf->hw_cmds))));
+	json_object_add_value_int(root, "Host Write Odd End Commands",
+			(uint64_t)le64_to_cpu(perf->hw_oe_cmds));
+	json_object_add_value_int(root, "Host Write Odd End Commands Percentage",
+			(uint64_t)calc_percent((le64_to_cpu(perf->hw_oe_cmds)), (le64_to_cpu((perf->hw_cmds)))));
+	json_object_add_value_int(root, "Host Write Commands Stalled",
+		(uint64_t)le64_to_cpu(perf->hw_st_cmds));
+	json_object_add_value_int(root, "Host Write Commands Stalled Percentage",
+		(uint64_t)calc_percent((le64_to_cpu(perf->hw_st_cmds)), (le64_to_cpu(perf->hw_cmds))));
+	json_object_add_value_int(root, "NAND Read Commands",
+		(uint64_t)le64_to_cpu(perf->nr_cmds));
+	json_object_add_value_int(root, "NAND Read Blocks Commands",
+		(uint64_t)le64_to_cpu(perf->nr_blks));
+	json_object_add_value_int(root, "Average NAND Read Size",
+		safe_div_fp((le64_to_cpu(perf->nr_blks)), (le64_to_cpu((perf->nr_cmds)))));
+	json_object_add_value_int(root, "Host Write Odd Start Commands",
+			(uint64_t)le64_to_cpu(perf->hw_os_cmds));
+	json_object_add_value_int(root, "Nand Write Commands",
+			(uint64_t)le64_to_cpu(perf->nw_cmds));
+	json_object_add_value_int(root, "NAND Write Blocks",
+			(uint64_t)le64_to_cpu(perf->nw_blks));
+	json_object_add_value_int(root, "Average NAND Write Size",
+			safe_div_fp((le64_to_cpu(perf->nw_blks)), (le64_to_cpu(perf->nw_cmds))));
+	json_object_add_value_int(root, "NAND Read Before Writen",
+			(uint64_t)le64_to_cpu(perf->nrbw));
+	json_print_object(root, NULL);
+	printf("\n");
+	json_free_object(root);
+}
+
+static int wdc_print_log(struct wdc_ssd_perf_stats *perf, int fmt)
+{
+	if (!perf) {
+		fprintf(stderr, "Invalid buffer to read perf stats\n");
+		return -1;
+	}
+	switch (fmt) {
+	case WDC_HUMAN:
+		wdc_print_log_human(perf);
+		break;
+	case WDC_JSON:
+		wdc_print_log_json(perf);
+		break;
+	}
 	return 0;
+}
+
+static int validate_output_format(char *format)
+{
+	if (!format)
+		return -EINVAL;
+	if (!strcmp(format, "human"))
+		return WDC_HUMAN;
+	if (!strcmp(format, "json"))
+		return WDC_JSON;
+	return -EINVAL;
 }
 
 static int wdc_smart_log_add(int argc, char **argv, struct command *command,
@@ -718,6 +805,7 @@ static int wdc_smart_log_add(int argc, char **argv, struct command *command,
 	int i;
 	int fd;
 	int ret;
+	int fmt = -1;
 	int skip_cnt = 4;
 	int total_subpages;
 	__u8 *data;
@@ -727,19 +815,29 @@ static int wdc_smart_log_add(int argc, char **argv, struct command *command,
 
 	struct config {
 		uint8_t interval;
+		int   vendor_specific;
+		char *output_format;
 	};
 
 	struct config cfg = {
-		.interval = 14
+		.interval = 14,
+		.output_format = "human",
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
 		{"interval", 'i', "NUM", CFG_POSITIVE, &cfg.interval, required_argument, interval},
+		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format, required_argument, "Output Format: human|json" },
 		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
 		{0}
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+
+	fmt = validate_output_format(cfg.output_format);
+	if (fmt < 0) {
+		fprintf(stderr, "ERROR : invalid output format\n");
+		return fmt;
+	}
 
 	if (cfg.interval < 1 || cfg.interval > 15) {
 		fprintf(stderr, "ERROR : interval out of range [1-15]\n");
@@ -762,7 +860,7 @@ static int wdc_smart_log_add(int argc, char **argv, struct command *command,
 			if (sph->spcode == WDC_GET_LOG_PAGE_SSD_PERFORMANCE) {
 				if (sph->pcset == cfg.interval) {
 					perf = (struct wdc_ssd_perf_stats *) (p + 4);
-					ret = wdc_print_log(perf);
+					ret = wdc_print_log(perf, fmt);
 					break;
 				}
 			}
