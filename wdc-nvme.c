@@ -62,11 +62,6 @@
 #define WDC_NVME_DRIVE_LOG_CMD				WDC_NVME_LOG_SIZE_DATA_LEN
 #define WDC_NVME_DRIVE_LOG_SUBCMD			0x00
 
-/* LED Beacon Disable */
-#define WDC_NVME_LED_BEACON_DISABLE_OPCODE	0xD4
-#define WDC_NVME_LED_BEACON_DISABLE_CMD		0x08
-#define WDC_NVME_LED_BEACON_DISABLE_SUBCMD	0x00
-
 /* Purge and Purge Monitor */
 #define WDC_NVME_PURGE_CMD_OPCODE			0xDD
 #define WDC_NVME_PURGE_MONITOR_OPCODE		0xDE
@@ -367,21 +362,6 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 	return wdc_do_cap_diag(fd, f);
 }
 
-static int wdc_led_beacon_disable(int fd)
-{
-	int ret;
-	struct nvme_admin_cmd admin_cmd;
-
-	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
-	admin_cmd.opcode = WDC_NVME_LED_BEACON_DISABLE_OPCODE;
-	admin_cmd.cdw12 = ((WDC_NVME_LED_BEACON_DISABLE_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
-			WDC_NVME_LED_BEACON_DISABLE_CMD);
-
-	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
-	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
-	return ret;
-}
-
 static int wdc_do_crash_dump(int fd, char *file)
 {
 	int ret;
@@ -407,7 +387,6 @@ static int wdc_do_crash_dump(int fd, char *file)
 				 WDC_NVME_CRASH_DUMP_CMD, crash_dump_length, file);
 		if (ret == 0)
 			ret = wdc_do_clear_dump(fd, opcode, cdw12);
-		wdc_led_beacon_disable(fd);
 	}
 	return ret;
 }
