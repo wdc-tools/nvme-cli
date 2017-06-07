@@ -95,6 +95,17 @@
 #define WDC_NVME_PURGE_STATE_REQ_PWR_CYC	0x03
 #define WDC_NVME_PURGE_STATE_PWR_CYC_PURGE	0x04
 
+/* Sanitize and Sanitize Status */
+#define WDC_NVME_SANITIZE_CMD_OPCODE		0x84
+#define WDC_NVME_SANITIZE_NO_DEALLOC		0x00000200
+#define WDC_NVME_SANITIZE_OIPBP				0x00000100
+#define WDC_NVME_SANITIZE_OWPASS_SHIFT		0x00000004
+#define WDC_NVME_SANITIZE_AUSE				0x00000008
+#define WDC_NVME_SANITIZE_ACT_CRYPTO_ERASE	0x00000004
+#define WDC_NVME_SANITIZE_ACT_OVERWRITE		0x00000003
+#define WDC_NVME_SANITIZE_ACT_BLOCK_ERASE	0x00000002
+#define WDC_NVME_SANITIZE_ACT_EXIT			0x00000001
+
 /* Clear dumps */
 #define WDC_NVME_CLEAR_DUMP_OPCODE			0xFF
 #define WDC_NVME_CLEAR_CRASH_DUMP_CMD		0x03
@@ -134,6 +145,8 @@ static int wdc_purge(int argc, char **argv,
 static int wdc_purge_monitor(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
 static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id);
+static int wdc_sanitize(int argc, char **argv,
+		struct command *command, struct plugin *plugin);
 
 /* Drive log data size */
 struct wdc_log_size {
@@ -801,6 +814,99 @@ static int wdc_purge_monitor(int argc, char **argv,
 			printf("Purge Progress = %f%%\n", progress_percent);
 		}
 	}
+	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	return ret;
+}
+
+static int wdc_sanitize(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	char *desc = "Send a Sanitize command.";
+	char *no_dealloc_desc = "No Deallocate After Sanitize.";
+	char *oipbp_desc = "Overwrite Invert Pattern Between Passes.";
+	char *owpass_desc = "Overwrite Pass Count.";
+	char *ause_desc = "Allow Unrestricted Sanitize Exit.";
+	char *sanact_desc = "Sanitize Action.";
+	char *ovrpat_desc = "Overwrite Pattern.";
+
+	int fd;
+	int ret;
+	__u32 sanitize_cdw10 = 0;
+	__u32 sanitize_cdw11 = 0;
+
+	struct nvme_passthru_cmd admin_cmd;
+
+	struct config {
+		uint8_t no_dealloc;
+		uint8_t oipbp;
+		uint8_t owpass;
+		uint8_t ause;
+		uint8_t sanact;
+		uint32_t ovrpat;
+	};
+
+	struct config cfg = {
+		.no_dealloc = 0,
+		.oipbp = 0,
+		.owpass = 0,
+		.ause = 0,
+		.sanact = 0,
+		.ovrpat = 0,
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"no_dealloc", 'd', "", CFG_NONE, &cfg.no_dealloc, no_argument, no_dealloc_desc},
+		{"oipbp", 'i', "", CFG_NONE, &cfg.oipbp, no_argument, oipbp_desc},
+		{"owpass", 'n', "NUM", CFG_POSITIVE, &cfg.owpass, required_argument, owpass_desc},
+		{"ause", 'u', "", CFG_NONE, &cfg.ause, no_argument, ause_desc},
+		{"sanact", 'a', "NUM", CFG_POSITIVE, &cfg.sanact, required_argument, sanact_desc},
+		{"ovrpat", 'p', "NUM", CFG_POSITIVE, &cfg.ovrpat, required_argument, ovrpat_desc},
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
+	switch (cfg.sanact) {
+	case WDC_NVME_SANITIZE_ACT_CRYPTO_ERASE:
+	case WDC_NVME_SANITIZE_ACT_BLOCK_ERASE:
+	case WDC_NVME_SANITIZE_ACT_EXIT:
+		sanitize_cdw10 = cfg.sanact;
+		break;
+	case WDC_NVME_SANITIZE_ACT_OVERWRITE:
+		sanitize_cdw10 = cfg.sanact;
+		sanitize_cdw11 = cfg.ovrpat;
+		break;
+	default:
+		fprintf(stderr, "ERROR : WDC : Invalid Sanitize Action\n");
+		return -1;
+	}
+
+	if (cfg.no_dealloc)
+		sanitize_cdw10 |= WDC_NVME_SANITIZE_NO_DEALLOC;
+
+	if (cfg.oipbp)
+		sanitize_cdw10 |= WDC_NVME_SANITIZE_OIPBP;
+
+	if (cfg.ause)
+		sanitize_cdw10 |= WDC_NVME_SANITIZE_AUSE;
+
+	if (cfg.owpass >= 0 && cfg.owpass <= 16) {
+		sanitize_cdw10 |= (cfg.owpass << WDC_NVME_SANITIZE_OWPASS_SHIFT);
+	} else {
+		fprintf(stderr, "ERROR : WDC : owpass out of range [0-16]\n");
+		return -1;
+	}
+
+	memset(&admin_cmd, 0, sizeof (admin_cmd));
+	admin_cmd.opcode = WDC_NVME_SANITIZE_CMD_OPCODE;
+	admin_cmd.cdw10 = sanitize_cdw10;
+	admin_cmd.cdw11 = sanitize_cdw11;
+
+	wdc_check_device(fd);
+	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
 	return ret;
 }
