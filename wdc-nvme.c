@@ -95,7 +95,7 @@
 #define WDC_NVME_PURGE_STATE_REQ_PWR_CYC	0x03
 #define WDC_NVME_PURGE_STATE_PWR_CYC_PURGE	0x04
 
-/* Sanitize and Sanitize Status */
+/* Sanitize and Sanitize Monitor Status */
 #define WDC_NVME_SANITIZE_CMD_OPCODE		0x84
 #define WDC_NVME_SANITIZE_NO_DEALLOC		0x00000200
 #define WDC_NVME_SANITIZE_OIPBP				0x00000100
@@ -105,6 +105,15 @@
 #define WDC_NVME_SANITIZE_ACT_OVERWRITE		0x00000003
 #define WDC_NVME_SANITIZE_ACT_BLOCK_ERASE	0x00000002
 #define WDC_NVME_SANITIZE_ACT_EXIT			0x00000001
+
+#define WDC_NVME_SANITIZE_STATUS_LOG_ID			0x81
+#define WDC_NVME_SANITIZE_STATUS_DATA_LEN		0x14
+#define WDC_NVME_SANITIZE_GLOBAL_DATA_ERASED	0x0100
+#define WDC_NVME_SANITIZE_STATUS_MASK			0x0007
+#define WDC_NVME_NEVER_SANITIZED				0x0000
+#define WDC_NVME_SANITIZE_COMPLETED_SUCCESS		0x0001
+#define WDC_NVME_SANITIZE_IN_PROGESS			0x0002
+#define WDC_NVME_SANITIZE_COMPLETED_FAILED		0x0003
 
 /* Clear dumps */
 #define WDC_NVME_CLEAR_DUMP_OPCODE			0xFF
@@ -147,6 +156,10 @@ static int wdc_purge_monitor(int argc, char **argv,
 static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id);
 static int wdc_sanitize(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
+static int wdc_sanitize_monitor(int argc, char **argv,
+		struct command *command, struct plugin *plugin);
+static const char* wdc_sanitize_mon_status_to_string(__u16 status);
+
 
 /* Drive log data size */
 struct wdc_log_size {
@@ -239,6 +252,17 @@ struct __attribute__((__packed__)) wdc_ssd_ca_perf_stats {
 	__le32	rsvd1;						/* 0x78 - Reserved							*/
 	__le32	rsvd2;						/* 0x7C - Reserved							*/
 };
+
+/* Sanitize Log Page data */
+struct wdc_nvme_sanitize_log_page_data {
+	__le16	progress;
+	__le16	status;
+	__le32	cdw10_info;
+	__le32	est_ovrwrt_time;
+	__le32	est_blk_erase_time;
+	__le32	est_crypto_erase_time;
+};
+
 
 static double safe_div_fp(double numerator, double denominator)
 {
@@ -908,6 +932,74 @@ static int wdc_sanitize(int argc, char **argv, struct command *command,
 	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
 
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	return ret;
+}
+
+static const char* wdc_sanitize_mon_status_to_string(__u16 status)
+{
+	const char *str;
+
+	switch (status & WDC_NVME_SANITIZE_STATUS_MASK) {
+	case WDC_NVME_NEVER_SANITIZED:
+		str = "NVM Subsystem has never been sanitized.";
+		break;
+	case WDC_NVME_SANITIZE_COMPLETED_SUCCESS:
+		str = "Most Recent Sanitize Command Completed Successfully.";
+		break;
+	case WDC_NVME_SANITIZE_IN_PROGESS:
+		str = "Sanitize in Progress.";
+		break;
+	case WDC_NVME_SANITIZE_COMPLETED_FAILED:
+		str = "Most Recent Sanitize Command Failed.";
+		break;
+	default:
+		str = "Unknown.";
+	}
+
+	return str;
+}
+
+static int wdc_sanitize_monitor(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	char *desc = "Send a Sanitize Monitor command.";
+	int fd;
+	int ret;
+	__u8 output[WDC_NVME_SANITIZE_STATUS_DATA_LEN];
+	struct wdc_nvme_sanitize_log_page_data *slp;
+	double progress_percent;
+	const struct argconfig_commandline_options command_line_options[] = {
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
+		{NULL}
+	};
+
+	memset(output, 0, sizeof (output));
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
+	wdc_check_device(fd);
+
+	ret = nvme_get_log(fd, 0x01, WDC_NVME_SANITIZE_STATUS_LOG_ID, WDC_NVME_SANITIZE_STATUS_DATA_LEN, output);
+	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	if (ret != 0)
+		return ret;
+
+	slp = (struct wdc_nvme_sanitize_log_page_data *) output;
+	printf("Sanitize status                     = 0x%0x\n", slp->status);
+	printf("%s\n", wdc_sanitize_mon_status_to_string(slp->status));
+
+	if ((slp->status & WDC_NVME_SANITIZE_STATUS_MASK) == WDC_NVME_SANITIZE_IN_PROGESS) {
+		progress_percent = (((double)le32_to_cpu(slp->progress) * 100) / 0x10000);
+		printf("Sanitize Progress (percentage)      = %f%%\n", progress_percent);
+	} else {
+		if (slp->status & WDC_NVME_SANITIZE_GLOBAL_DATA_ERASED)
+			printf("Global Data Erased Set\n");
+		else
+			printf("Global Data Erased Cleared\n");
+	}
+
 	return ret;
 }
 
