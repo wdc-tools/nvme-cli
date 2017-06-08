@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
 <meta name="generator" content="AsciiDoc 8.6.8" />
-<title>nvme-wdc-cap-diag(1)</title>
+<title>nvme-gen-hostnqn(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -732,12 +732,12 @@ asciidoc.install();
 <body class="manpage">
 <div id="header">
 <h1>
-nvme-wdc-cap-diag(1) Manual Page
+nvme-gen-hostnqn(1) Manual Page
 </h1>
 <h2>NAME</h2>
 <div class="sectionbody">
-<p>nvme-wdc-cap-diag -
-   Retrieve WDC device's diagnostic log and save to file.
+<p>nvme-gen-hostnqn -
+   Generate a host NVMe Qualified Name
 </p>
 </div>
 </div>
@@ -746,7 +746,7 @@ nvme-wdc-cap-diag(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>nvme wdc cap-diag</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]</pre>
+<pre class="content"><em>nvme gen-hostnqn</em></pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -754,78 +754,34 @@ nvme-wdc-cap-diag(1) Manual Page
 <div class="sect1">
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>For the NVMe device given, sends the WDC Vendor Unique Capture-Diagnostics
-request and saves the result to a file.</p></div>
-<div class="paragraph"><p>The &lt;device&gt; parameter is mandatory NVMe character device (ex: /dev/nvme0).</p></div>
-<div class="paragraph"><p>This will only work on WDC devices supporting this feature.
-Results for any other device are undefined.</p></div>
-<div class="paragraph"><p>This will only work on WDC devices which are capable of generating capture
-diagnostics log. Results for any other device are undefined.</p></div>
+<div class="paragraph"><p>Generate a random host NQN in the form:
+nqn.2014-08.org.nvmexpress:NVMf:uuid:1b4e28ba-2fa1-11d2-883f-0016d3cca427
+and prints it to stdout.</p></div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_options">OPTIONS</h2>
 <div class="sectionbody">
-<div class="dlist"><dl>
-<dt class="hdlist1">
--o &lt;FILE&gt;
-</dt>
-<dt class="hdlist1">
---output-file=&lt;FILE&gt;
-</dt>
-<dd>
-<p>
-        Output file; defaults to device serial number followed by "cap_diag" suffix
-</p>
-</dd>
-</dl></div>
+<div class="paragraph"><p>No options needed</p></div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_examples">EXAMPLES</h2>
 <div class="sectionbody">
-<div class="ulist"><ul>
-<li>
-<p>
-Gets the capture diagnostics log from the device and saves to default file in current directory (e.g. STM00019F3F9cap_diag.bin):
-</p>
-<div class="listingblock">
-<div class="content">
-<pre><code># nvme wdc cap-diag /dev/nvme0</code></pre>
-</div></div>
-</li>
-<li>
-<p>
-Gets the capture diagnostics log from the device and saves to defined file in current directory (e.g. testSTM00019F3F9cap_diag.bin):
-</p>
-<div class="listingblock">
-<div class="content">
-<pre><code># nvme wdc cap-diag /dev/nvme0 -o test</code></pre>
-</div></div>
-</li>
-<li>
-<p>
-Gets the capture diagnostics log from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9cap_diag.bin):
-</p>
-<div class="listingblock">
-<div class="content">
-<pre><code># nvme wdc cap-diag /dev/nvme0 -o /tmp/test</code></pre>
-</div></div>
-</li>
-</ul></div>
+<div class="paragraph"><p>nvme gen-hostnqn</p></div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_nvme">NVME</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>Part of the nvme-user suite.</p></div>
+<div class="paragraph"><p>Part of the nvme-user suite</p></div>
 </div>
 </div>
 </div>
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-29 17:19:30 PST
+Last updated 2017-01-18 12:10:13 EST
 </div>
 </div>
 </body>

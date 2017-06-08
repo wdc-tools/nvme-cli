@@ -19,6 +19,9 @@ provides the result and returned structure.
 The <device> parameter is mandatory and may be either the NVMe character
 device (ex: /dev/nvme0), or a namespace block device (ex: /dev/nvme0n1).
 
+This will only work on WDC devices supporting this feature.
+Results for any other device are undefined.
+
 On success, the structure may be returned in one of several ways depending
 on the option flags; the structure may be parsed by the program or the
 raw buffer may be printed to stdout.

@@ -1,25 +1,26 @@
-CFLAGS += -std=gnu99 -O2 -g -Wall -Werror
+CFLAGS ?= -O2 -g -Wall -Werror
+CFLAGS += -std=gnu99
 CPPFLAGS += -D_GNU_SOURCE -D__CHECK_ENDIAN__
+LIBUUID = $(shell ld -o /dev/null -luuid >/dev/null 2>&1; echo $$?)
 NVME = nvme
 INSTALL ?= install
 DESTDIR =
 PREFIX ?= /usr/local
 SYSCONFDIR = /etc
 SBINDIR = $(PREFIX)/sbin
-LIBUDEV := $(shell ld -o /dev/null -ludev >/dev/null 2>&1; echo $$?)
 LIB_DEPENDS =
+
+ifeq ($(LIBUUID),0)
+	override LDFLAGS += -luuid
+	override CFLAGS += -DLIBUUID
+	override LIB_DEPENDS += uuid
+endif
 
 RPMBUILD = rpmbuild
 TAR = tar
 RM = rm -f
 
 AUTHOR=Keith Busch <keith.busch@intel.com>
-
-ifeq ($(LIBUDEV),0)
-	override LDFLAGS += -ludev
-	override CFLAGS  += -DLIBUDEV_EXISTS
-	override LIB_DEPENDS += udev
-endif
 
 default: $(NVME)
 
@@ -32,7 +33,7 @@ NVME_DPKG_VERSION=1~`lsb_release -sc`
 
 OBJS := argconfig.o suffix.o parser.o nvme-print.o nvme-ioctl.o \
 	nvme-lightnvm.o fabrics.o json.o plugin.o intel-nvme.o \
-	lnvm-nvme.o memblaze-nvme.o wdc-nvme.o nvme-models.o
+	lnvm-nvme.o memblaze-nvme.o wdc-nvme.o nvme-models.o huawei-nvme.o
 
 nvme: nvme.c nvme.h $(OBJS) NVME-VERSION-FILE
 	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c -o $(NVME) $(OBJS) $(LDFLAGS)
@@ -54,6 +55,7 @@ all: doc
 clean:
 	$(RM) $(NVME) *.o *~ a.out NVME-VERSION-FILE *.tar* nvme.spec version control nvme-*.deb
 	$(MAKE) -C Documentation clean
+	$(RM) tests/*.pyc
 
 clobber: clean
 	$(MAKE) -C Documentation clobber
@@ -66,8 +68,8 @@ install-bin: default
 	$(INSTALL) -m 755 nvme $(DESTDIR)$(SBINDIR)
 
 install-bash-completion:
-	$(INSTALL) -d $(DESTDIR)$(SYSCONFDIR)/bash_completion.d
-	$(INSTALL) -m 644 -T ./completions/bash-nvme-completion.sh $(DESTDIR)$(SYSCONFDIR)/bash_completion.d/nvme
+	$(INSTALL) -d $(DESTDIR)$(PREFIX)/share/bash_completion.d
+	$(INSTALL) -m 644 -T ./completions/bash-nvme-completion.sh $(DESTDIR)$(PREFIX)/share/bash_completion.d/nvme
 
 install: install-bin install-man install-bash-completion
 

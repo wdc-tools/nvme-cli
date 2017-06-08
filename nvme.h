@@ -16,7 +16,9 @@
 #define _NVME_H
 
 #include <stdbool.h>
+#include <endian.h>
 #include "plugin.h"
+#include "json.h"
 
 #define unlikely(x) x
 #include "linux/nvme.h"
@@ -51,44 +53,6 @@ enum {
 	NVME_ID_CNS_NS_PRESENT		= 0x11,
 	NVME_ID_CNS_CTRL_NS_LIST	= 0x12,
 	NVME_ID_CNS_CTRL_LIST		= 0x13,
-};
-
-#pragma pack(push,1)
-struct nvme_additional_smart_log_item {
-	__u8			key;
-	__u8			_kp[2];
-	__u8			norm;
-	__u8			_np;
-	union {
-		__u8		raw[6];
-		struct wear_level {
-			__le16	min;
-			__le16	max;
-			__le16	avg;
-		} wear_level ;
-		struct thermal_throttle {
-			__u8	pct;
-			__u32	count;
-		} thermal_throttle;
-	};
-	__u8			_rp;
-};
-#pragma pack(pop)
-
-struct nvme_additional_smart_log {
-	struct nvme_additional_smart_log_item	program_fail_cnt;
-	struct nvme_additional_smart_log_item	erase_fail_cnt;
-	struct nvme_additional_smart_log_item	wear_leveling_cnt;
-	struct nvme_additional_smart_log_item	e2e_err_cnt;
-	struct nvme_additional_smart_log_item	crc_err_cnt;
-	struct nvme_additional_smart_log_item	timed_workload_media_wear;
-	struct nvme_additional_smart_log_item	timed_workload_host_reads;
-	struct nvme_additional_smart_log_item	timed_workload_timer;
-	struct nvme_additional_smart_log_item	thermal_throttle_status;
-	struct nvme_additional_smart_log_item	retry_buffer_overflow_cnt;
-	struct nvme_additional_smart_log_item	pll_lock_loss_cnt;
-	struct nvme_additional_smart_log_item	nand_bytes_written;
-	struct nvme_additional_smart_log_item	host_bytes_written;
 };
 
 struct nvme_host_mem_buffer {
@@ -147,6 +111,12 @@ struct list_item {
 	unsigned            block;
 };
 
+enum {
+	NORMAL,
+	JSON,
+	BINARY,
+};
+
 void register_extension(struct plugin *plugin);
 
 #include "argconfig.h"
@@ -155,6 +125,7 @@ int parse_and_open(int argc, char **argv, const char *desc,
 
 extern const char *devicename;
 
-int __id_ctrl(int argc, char **argv, struct command *cmd, struct plugin *plugin, void (*vs)(__u8 *vs));
+int __id_ctrl(int argc, char **argv, struct command *cmd, struct plugin *plugin, void (*vs)(__u8 *vs, struct json_object *root));
+int	validate_output_format(char *format);
 
 #endif /* _NVME_H */

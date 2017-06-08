@@ -21,9 +21,6 @@ The <device> parameter is mandatory NVMe character device (ex: /dev/nvme0).
 This will only work on WDC devices supporting this feature.
 Results for any other device are undefined.
 
-This will only work on WDC devices which are capable of generating capture
-diagnostics log. Results for any other device are undefined.
-
 OPTIONS
 -------
 -o <FILE>::

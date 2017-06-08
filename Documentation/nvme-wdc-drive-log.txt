@@ -19,8 +19,8 @@ The <device> parameter is mandatory and may be either the NVMe
 character device (ex: /dev/nvme0), or a namespace block device (ex:
 /dev/nvme0n1).
 
-This will only work on wdc devices. Results for any other device are
-undefined.
+This will only work on WDC devices supporting this feature.
+Results for any other device are undefined.
 
 OPTIONS
 -------

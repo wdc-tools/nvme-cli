@@ -26,14 +26,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <sys/ioctl.h>
 #include <asm/byteorder.h>
 #include <inttypes.h>
-#ifdef LIBUDEV_EXISTS
-#include <libudev.h>
-#endif
-
 #include <linux/types.h>
+#include <libgen.h>
+#include <sys/stat.h>
+#include <stddef.h>
 
 #include "parser.h"
 #include "nvme-ioctl.h"
@@ -52,6 +52,7 @@ static struct config {
 	char *host_traddr;
 	char *hostnqn;
 	char *nr_io_queues;
+	char *queue_size;
 	char *keep_alive_tmo;
 	char *reconnect_delay;
 	char *raw;
@@ -62,6 +63,7 @@ static struct config {
 #define PATH_NVME_FABRICS	"/dev/nvme-fabrics"
 #define PATH_NVMF_DISC		"/etc/nvme/discovery.conf"
 #define PATH_NVMF_HOSTNQN	"/etc/nvme/hostnqn"
+#define SYS_NVME		"/sys/class/nvme"
 #define MAX_DISC_ARGS		10
 
 enum {
@@ -356,6 +358,17 @@ out:
 	return error;
 }
 
+static int space_strip_len(int max, const char *str)
+{
+	int i;
+
+	for (i = max - 1; i >= 0; i--)
+		if (str[i] != '\0' && str[i] != ' ')
+			break;
+
+	return i + 1;
+}
+
 static void print_discovery_log(struct nvmf_disc_rsp_page_hdr *log, int numrec)
 {
 	int i;
@@ -373,9 +386,13 @@ static void print_discovery_log(struct nvmf_disc_rsp_page_hdr *log, int numrec)
 		printf("subtype: %s\n", subtype_str(e->subtype));
 		printf("treq:    %s\n", treq_str(e->treq));
 		printf("portid:  %d\n", e->portid);
-		printf("trsvcid: %s\n", e->trsvcid);
+		printf("trsvcid: %.*s\n",
+		       space_strip_len(NVMF_TRSVCID_SIZE, e->trsvcid),
+		       e->trsvcid);
 		printf("subnqn:  %s\n", e->subnqn);
-		printf("traddr:  %s\n", e->traddr);
+		printf("traddr:  %.*s\n",
+		       space_strip_len(NVMF_TRADDR_SIZE, e->traddr),
+		       e->traddr);
 
 		switch (e->trtype) {
 		case NVMF_TRTYPE_RDMA:
@@ -508,6 +525,15 @@ static int build_options(char *argstr, int max_len)
 		max_len -= len;
 	}
 
+	if (cfg.queue_size) {
+		len = snprintf(argstr, max_len, ",queue_size=%s",
+				cfg.queue_size);
+		if (len < 0)
+			return -EINVAL;
+		argstr += len;
+		max_len -= len;
+	}
+
 	if (cfg.keep_alive_tmo) {
 		len = snprintf(argstr, max_len, ",keep_alive_tmo=%s", cfg.keep_alive_tmo);
 		if (len < 0)
@@ -574,12 +600,16 @@ static int connect_ctrl(struct nvmf_disc_rsp_page_entry *e)
 				return -EINVAL;
 			p += len;
 
-			len = sprintf(p, ",traddr=%s", e->traddr);
+			len = sprintf(p, ",traddr=%.*s",
+				      space_strip_len(NVMF_TRADDR_SIZE, e->traddr),
+				      e->traddr);
 			if (len < 0)
 				return -EINVAL;
 			p += len;
 
-			len = sprintf(p, ",trsvcid=%s", e->trsvcid);
+			len = sprintf(p, ",trsvcid=%.*s",
+				      space_strip_len(NVMF_TRSVCID_SIZE, e->trsvcid),
+				      e->trsvcid);
 			if (len < 0)
 				return -EINVAL;
 			p += len;
@@ -597,7 +627,14 @@ static int connect_ctrl(struct nvmf_disc_rsp_page_entry *e)
 				return -EINVAL;
 			p += len;
 
-			len = sprintf(p, ",traddr=%s", e->traddr);
+			len = sprintf(p, ",host_traddr=%s", cfg.host_traddr);
+			if (len < 0)
+				return -EINVAL;
+			p+= len;
+
+			len = sprintf(p, ",traddr=%.*s",
+				      space_strip_len(NVMF_TRADDR_SIZE, e->traddr),
+				      e->traddr);
 			if (len < 0)
 				return -EINVAL;
 			p += len;
@@ -745,6 +782,7 @@ int discover(const char *desc, int argc, char **argv, bool connect)
 		{"trsvcid",     's', "LIST", CFG_STRING, &cfg.trsvcid,     required_argument, "transport service id (e.g. IP port)" },
 		{"host-traddr", 'w', "LIST", CFG_STRING, &cfg.host_traddr, required_argument, "host traddr (e.g. FC WWN's)" },
 		{"hostnqn",     'q', "LIST", CFG_STRING, &cfg.hostnqn,     required_argument, "user-defined hostnqn (if default not used)" },
+		{"queue-size",  'Q', "LIST", CFG_STRING, &cfg.queue_size,  required_argument, "number of io queue elements to use (default 128)" },
 		{"raw",         'r', "LIST", CFG_STRING, &cfg.raw,         required_argument, "raw output file" },
 		{NULL},
 	};
@@ -778,6 +816,7 @@ int connect(const char *desc, int argc, char **argv)
 		{"host-traddr",     'w', "LIST", CFG_STRING, &cfg.host_traddr,     required_argument, "host traddr (e.g. FC WWN's)" },
 		{"hostnqn",         'q', "LIST", CFG_STRING, &cfg.hostnqn,         required_argument, "user-defined hostnqn" },
 		{"nr-io-queues",    'i', "LIST", CFG_STRING, &cfg.nr_io_queues,    required_argument, "number of io queues to use (default is core count)" },
+		{"queue-size",      'Q', "LIST", CFG_STRING, &cfg.queue_size,      required_argument, "number of io queue elements to use (default 128)" },
 		{"keep-alive-tmo",  'k', "LIST", CFG_STRING, &cfg.keep_alive_tmo,  required_argument, "keep alive timeout period in seconds" },
 		{"reconnect-delay", 'c', "LIST", CFG_STRING, &cfg.reconnect_delay, required_argument, "reconnect timeout period in seconds" },
 		{NULL},
@@ -801,94 +840,86 @@ int connect(const char *desc, int argc, char **argv)
 	return 0;
 }
 
-#ifdef LIBUDEV_EXISTS
-static int disconnect_subsys(struct udev_enumerate *enumerate, char *nqn)
+static int scan_sys_nvme_filter(const struct dirent *d)
 {
-	struct udev_list_entry *list_entry;
-	const char *subsysnqn;
-	char *sysfs_path;
-	int ret = 1;
+	if (!strcmp(d->d_name, "."))
+		return 0;
+	if (!strcmp(d->d_name, ".."))
+		return 0;
+	return 1;
+}
 
-	udev_list_entry_foreach(list_entry,
-				udev_enumerate_get_list_entry(enumerate)) {
-		struct udev_device *device;
+/*
+ * Returns 1 if disconnect occurred, 0 otherwise.
+ */
+static int disconnect_subsys(char *nqn, char *ctrl)
+{
+	char *sysfs_nqn_path = NULL, *sysfs_del_path = NULL;
+	char subsysnqn[NVMF_NQN_SIZE] = {};
+	int fd, ret = 0;
 
-		device = udev_device_new_from_syspath(
-				udev_enumerate_get_udev(enumerate),
-				udev_list_entry_get_name(list_entry));
-		if (device != NULL) {
-			subsysnqn = udev_device_get_sysattr_value(
-					device, "subsysnqn");
-			if (subsysnqn && !strcmp(subsysnqn, nqn)) {
-				if (asprintf(&sysfs_path,
-					"%s/delete_controller",
-					udev_device_get_syspath(device)) < 0) {
-					ret = errno;
-					udev_device_unref(device);
-					break;
-				}
-				udev_device_unref(device);
-				ret = remove_ctrl_by_path(sysfs_path);
-				free(sysfs_path);
-				break;
-			}
-			udev_device_unref(device);
-		}
-	}
+	if (asprintf(&sysfs_nqn_path, "%s/%s/subsysnqn", SYS_NVME, ctrl) < 0)
+		goto free;
+	if (asprintf(&sysfs_del_path, "%s/%s/delete_controller", SYS_NVME, ctrl) < 0)
+		goto free;
 
+	fd = open(sysfs_nqn_path, O_RDONLY);
+	if (fd < 0)
+		goto free;
+
+	if (read(fd, subsysnqn, NVMF_NQN_SIZE) < 0)
+		goto close;
+
+	subsysnqn[strcspn(subsysnqn, "\n")] = '\0';
+	if (strcmp(subsysnqn, nqn))
+		goto close;
+
+	if (!remove_ctrl_by_path(sysfs_del_path))
+		ret = 1;
+ close:
+	close(fd);
+ free:
+	free(sysfs_del_path);
+	free(sysfs_nqn_path);
 	return ret;
 }
 
+/*
+ * Returns the number of controllers successfully disconnected.
+ */
 static int disconnect_by_nqn(char *nqn)
 {
-	struct udev *udev;
-	struct udev_enumerate *udev_enumerate;
-	int ret;
+	struct dirent **devices = NULL;
+	int i, n, ret = 0;
 
-	if (strlen(nqn) > NVMF_NQN_SIZE) {
-		ret = -EINVAL;
-		goto exit;
-	}
+	if (strlen(nqn) > NVMF_NQN_SIZE)
+		return -EINVAL;
 
-	udev = udev_new();
-	if (!udev) {
-		fprintf(stderr, "failed to create udev\n");
-		ret = -ENOMEM;
-		goto exit;
-	}
+	n = scandir(SYS_NVME, &devices, scan_sys_nvme_filter, alphasort);
+	if (n < 0)
+		return n;
 
-	udev_enumerate = udev_enumerate_new(udev);
-	if (udev_enumerate == NULL) {
-		ret = -ENOMEM;
-		goto free_udev;
-	}
+	for (i = 0; i < n; i++)
+		ret += disconnect_subsys(nqn, devices[i]->d_name);
 
-	udev_enumerate_add_match_subsystem(udev_enumerate, "nvme");
-	udev_enumerate_scan_devices(udev_enumerate);
-	ret = disconnect_subsys(udev_enumerate, nqn);
-	udev_enumerate_unref(udev_enumerate);
+	for (i = 0; i < n; i++)
+		free(devices[i]);
+	free(devices);
 
-free_udev:
-	udev_unref(udev);
-exit:
 	return ret;
 }
-#else
-static int disconnect_by_nqn(char *nqn)
-{
-	fprintf(stderr, "libudev not detected, install and rebuild.\n");
-	return -1;
-}
-#endif
 
 static int disconnect_by_device(char *device)
 {
 	int instance;
 	int ret;
 
+	device = basename(device);
 	ret = sscanf(device, "nvme%d", &instance);
 	if (ret < 0)
 		return ret;
+	if (!ret)
+		return -1;
 
 	return remove_ctrl(instance);
 }
@@ -914,9 +945,13 @@ int disconnect(const char *desc, int argc, char **argv)
 
 	if (cfg.nqn) {
 		ret = disconnect_by_nqn(cfg.nqn);
-		if (ret)
+		if (ret < 0)
 			fprintf(stderr, "Failed to disconnect by NQN: %s\n",
 				cfg.nqn);
+		else {
+			printf("NQN:%s disconnected %d controller(s)\n", cfg.nqn, ret);
+			ret = 0;
+		}
 	}
 
 	if (cfg.device) {
