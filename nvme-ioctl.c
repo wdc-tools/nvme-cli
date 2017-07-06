@@ -300,12 +300,13 @@ int nvme_resv_release(int fd, __u32 nsid, __u8 rtype, __u8 rrela,
 	return nvme_submit_io_passthru(fd, &cmd);
 }
 
-int nvme_resv_report(int fd, __u32 nsid, __u32 numd, void *data)
+int nvme_resv_report(int fd, __u32 nsid, __u32 numd, __u32 cdw11, void *data)
 {
 	struct nvme_passthru_cmd cmd = {
 		.opcode		= nvme_cmd_resv_report,
 		.nsid		= nsid,
 		.cdw10		= numd,
+		.cdw11		= cdw11,
 		.addr		= (__u64)(uintptr_t) data,
 		.data_len	= numd << 2,
 	};
@@ -362,6 +363,12 @@ int nvme_identify_ctrl_list(int fd, __u32 nsid, __u16 cntid, void *data)
 	int cns = nsid ? NVME_ID_CNS_CTRL_NS_LIST : NVME_ID_CNS_CTRL_LIST;
 
 	return nvme_identify(fd, nsid, (cntid << 16) | cns, data);
+}
+
+int nvme_identify_ns_descs(int fd, __u32 nsid, void *data)
+{
+
+	return nvme_identify(fd, nsid, NVME_ID_CNS_CTRL_LIST, data);
 }
 
 int nvme_get_log(int fd, __u32 nsid, __u8 log_id, __u32 data_len, void *data)

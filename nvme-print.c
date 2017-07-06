@@ -599,6 +599,124 @@ void show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int mode)
 	}
 }
 
+void json_nvme_id_ns_descs(void *data)
+{
+#ifdef LIBUUID
+	uuid_t uuid;
+	char uuid_str[37];
+#endif
+	__u8 eui64_desc[8];
+	__u8 nguid_desc[16];
+	char nguid_str[2 * sizeof(nguid_desc) + 1];
+	char eui64_str[2 * sizeof(eui64_desc) + 1];
+	char *eui64 = eui64_str;
+	char *nguid = nguid_str;
+	struct json_object *root;
+	off_t off;
+	int pos, len = 0;
+	int i;
+
+	root = json_create_object();
+
+	for (pos = 0; pos < NVME_IDENTIFY_DATA_SIZE; pos += len) {
+		struct nvme_ns_id_desc *cur = data + pos;
+
+		off = pos + sizeof(*cur);
+
+		if (cur->nidl == 0)
+			break;
+
+		switch (cur->nidt) {
+		case NVME_NIDT_EUI64:
+			memset(eui64, 0, sizeof(eui64_str));
+			memcpy(eui64_desc, data + off, sizeof(eui64_desc));
+			for (i = 0; i < sizeof(eui64); i++)
+				eui64 += sprintf(eui64, "%02x", eui64_desc[i]);
+			len += sizeof(eui64);
+			json_object_add_value_string(root, "eui64", eui64_str);
+			break;
+		case NVME_NIDT_NGUID:
+			memset(nguid, 0, sizeof(nguid_str));
+			memcpy(nguid_desc, data + off, sizeof(nguid_desc));
+			for (i = 0; i < sizeof(nguid); i++)
+				nguid += sprintf(nguid, "%02x", nguid_desc[i]);
+			len += sizeof(nguid);
+			json_object_add_value_string(root, "nguid", nguid_str);
+			break;
+#ifdef LIBUUID
+		case NVME_NIDT_UUID:
+			memcpy(uuid, data + off, 16);
+			uuid_unparse_lower(uuid, uuid_str);
+			len += sizeof(uuid);
+			json_object_add_value_string(root, "uuid", uuid_str);
+			break;
+#endif
+		default:
+			/* Skip unnkown types */
+			len = cur->nidl;
+			break;
+		}
+
+		len += sizeof(*cur);
+	}
+
+	json_print_object(root, NULL);
+	printf("\n");
+	json_free_object(root);
+}
+
+void show_nvme_id_ns_descs(void *data)
+{
+	int pos, len = 0;
+	int i;
+#ifdef LIBUUID
+	uuid_t uuid;
+	char uuid_str[37];
+#endif
+	__u8 eui64[8];
+	__u8 nguid[16];
+
+	for (pos = 0; pos < NVME_IDENTIFY_DATA_SIZE; pos += len) {
+		struct nvme_ns_id_desc *cur = data + pos;
+
+		if (cur->nidl == 0)
+			break;
+
+		switch (cur->nidt) {
+		case NVME_NIDT_EUI64:
+			memcpy(eui64, data + pos + sizeof(*cur), sizeof(eui64));
+			printf("eui64   : ");
+			for (i = 0; i < 8; i++)
+				printf("%02x", eui64[i]);
+			printf("\n");
+			len += sizeof(eui64);
+			break;
+		case NVME_NIDT_NGUID:
+			memcpy(nguid, data + pos + sizeof(*cur), sizeof(nguid));
+			printf("nguid   : ");
+			for (i = 0; i < 16; i++)
+				printf("%02x", nguid[i]);
+			printf("\n");
+			len += sizeof(nguid);
+			break;
+#ifdef LIBUUID
+		case NVME_NIDT_UUID:
+			memcpy(uuid, data + pos + sizeof(*cur), 16);
+			uuid_unparse_lower(uuid, uuid_str);
+			printf("uuid    : %s\n", uuid_str);
+			len += sizeof(uuid);
+			break;
+#endif
+		default:
+			/* Skip unnkown types */
+			len = cur->nidl;
+			break;
+		}
+
+		len += sizeof(*cur);
+	}
+}
+
 static void print_ps_power_and_scale(__le16 ctr_power, __u8 scale)
 {
 	__u16 power = le16_to_cpu(ctr_power);
@@ -799,28 +917,52 @@ void show_error_log(struct nvme_error_log_page *err_log, int entries, const char
 	}
 }
 
-void show_nvme_resv_report(struct nvme_reservation_status *status)
+void show_nvme_resv_report(struct nvme_reservation_status *status, int bytes, __u32 cdw11)
 {
-	int i, regctl;
+	int i, j, regctl, entries;
 
 	regctl = status->regctl[0] | (status->regctl[1] << 8);
 
 	printf("\nNVME Reservation status:\n\n");
 	printf("gen       : %d\n", le32_to_cpu(status->gen));
-	printf("regctl    : %d\n", regctl);
 	printf("rtype     : %d\n", status->rtype);
+	printf("regctl    : %d\n", regctl);
 	printf("ptpls     : %d\n", status->ptpls);
 
-	for (i = 0; i < regctl; i++) {
-		printf("regctl[%d] :\n", i);
-		printf("  cntlid  : %x\n", le16_to_cpu(status->regctl_ds[i].cntlid));
-		printf("  rcsts   : %x\n", status->regctl_ds[i].rcsts);
-		printf("  hostid  : %"PRIx64"\n", (uint64_t)le64_to_cpu(status->regctl_ds[i].hostid));
-		printf("  rkey    : %"PRIx64"\n", (uint64_t)le64_to_cpu(status->regctl_ds[i].rkey));
+	/* check Extended Data Structure bit */
+	if ((cdw11 & 0x1) == 0) {
+		/* if status buffer was too small, don't loop past the end of the buffer */
+		entries = (bytes - 24) / 24;
+		if (entries < regctl)
+			regctl = entries;
+
+		for (i = 0; i < regctl; i++) {
+			printf("regctl[%d] :\n", i);
+			printf("  cntlid  : %x\n", le16_to_cpu(status->regctl_ds[i].cntlid));
+			printf("  rcsts   : %x\n", status->regctl_ds[i].rcsts);
+			printf("  hostid  : %"PRIx64"\n", (uint64_t)le64_to_cpu(status->regctl_ds[i].hostid));
+			printf("  rkey    : %"PRIx64"\n", (uint64_t)le64_to_cpu(status->regctl_ds[i].rkey));
+		}
+	} else {
+		struct nvme_reservation_status_ext *ext_status = (struct nvme_reservation_status_ext *)status;
+		/* if status buffer was too small, don't loop past the end of the buffer */
+		entries = (bytes - 64) / 64;
+		if (entries < regctl)
+			regctl = entries;
+
+		for (i = 0; i < regctl; i++) {
+			printf("regctlext[%d] :\n", i);
+			printf("  cntlid     : %x\n", le16_to_cpu(ext_status->regctl_eds[i].cntlid));
+			printf("  rcsts      : %x\n", ext_status->regctl_eds[i].rcsts);
+			printf("  rkey       : %"PRIx64"\n", (uint64_t)le64_to_cpu(ext_status->regctl_eds[i].rkey));
+			printf("  hostid     : ");
+			for (j = 0; j < 16; j++)
+				printf("%x", ext_status->regctl_eds[i].hostid[j]);
+			printf("\n");
+		}
 	}
 	printf("\n");
 }
-
 
 static char *fw_to_string(__u64 fw)
 {
@@ -861,9 +1003,9 @@ uint64_t int48_to_long(__u8 *data)
 void show_smart_log(struct nvme_smart_log *smart, unsigned int nsid, const char *devname)
 {
 	/* convert temperature from Kelvin to Celsius */
-	int c;
 	int temperature = ((smart->temperature[1] << 8) |
 		smart->temperature[0]) - 273;
+	int i;
 
 	printf("Smart Log for NVME device:%s namespace-id:%x\n", devname, nsid);
 	printf("critical_warning                    : %#x\n", smart->critical_warning);
@@ -893,14 +1035,18 @@ void show_smart_log(struct nvme_smart_log *smart, unsigned int nsid, const char 
 		int128_to_double(smart->num_err_log_entries));
 	printf("Warning Temperature Time            : %u\n", le32_to_cpu(smart->warning_temp_time));
 	printf("Critical Composite Temperature Time : %u\n", le32_to_cpu(smart->critical_comp_time));
-	for (c=0; c < 8; c++) {
-		__s32 temp = le16_to_cpu(smart->temp_sensor[c]);
+	for (i = 0; i < 8; i++) {
+		__s32 temp = le16_to_cpu(smart->temp_sensor[i]);
 
 		if (temp == 0)
 			continue;
-		printf("Temperature Sensor %d                : %d C\n", c + 1,
+		printf("Temperature Sensor %d                : %d C\n", i + 1,
 			temp - 273);
 	}
+	printf("Thermal Management T1 Trans Count   : %u\n", le32_to_cpu(smart->thm_temp1_trans_count));
+	printf("Thermal Management T2 Trans Count   : %u\n", le32_to_cpu(smart->thm_temp2_trans_count));
+	printf("Thermal Management T1 Total Time    : %u\n", le32_to_cpu(smart->thm_temp1_total_time));
+	printf("Thermal Management T2 Total Time    : %u\n", le32_to_cpu(smart->thm_temp2_total_time));
 }
 
 char *nvme_feature_to_string(int feature)
@@ -919,6 +1065,7 @@ char *nvme_feature_to_string(int feature)
 	case NVME_FEAT_ASYNC_EVENT:	return "Async Event Configuration";
 	case NVME_FEAT_AUTO_PST:	return "Autonomous Power State Transition";
 	case NVME_FEAT_HOST_MEM_BUF:	return "Host Memory Buffer";
+	case NVME_FEAT_KATO:		return "Keep Alive Timer";
 	case NVME_FEAT_SW_PROGRESS:	return "Software Progress";
 	case NVME_FEAT_HOST_ID:		return "Host Identifier";
 	case NVME_FEAT_RESV_MASK:	return "Reservation Notification Mask";
@@ -955,6 +1102,8 @@ char *nvme_status_to_string(__u32 status)
 	case NVME_SC_FUSED_MISSING:		return "FUSED_MISSING";
 	case NVME_SC_INVALID_NS:		return "INVALID_NS";
 	case NVME_SC_CMD_SEQ_ERROR:		return "CMD_SEQ_ERROR";
+	case NVME_SC_SANITIZE_FAILED:		return "SANITIZE_FAILED";
+	case NVME_SC_SANITIZE_IN_PROGRESS:	return "SANITIZE_IN_PROGRESS";
 	case NVME_SC_LBA_RANGE:			return "LBA_RANGE";
 	case NVME_SC_CAP_EXCEEDED:		return "CAP_EXCEEDED";
 	case NVME_SC_NS_NOT_READY:		return "NS_NOT_READY";
@@ -1455,33 +1604,63 @@ void json_error_log(struct nvme_error_log_page *err_log, int entries, const char
 	json_free_object(root);
 }
 
-void json_nvme_resv_report(struct nvme_reservation_status *status)
+void json_nvme_resv_report(struct nvme_reservation_status *status, int bytes, __u32 cdw11)
 {
 	struct json_object *root;
 	struct json_array *rcs;
-	int i, regctl;
+	int i, j, regctl, entries;
 
 	regctl = status->regctl[0] | (status->regctl[1] << 8);
 
 	root = json_create_object();
 
 	json_object_add_value_int(root, "gen", le32_to_cpu(status->gen));
-	json_object_add_value_int(root, "regctl", regctl);
 	json_object_add_value_int(root, "rtype", status->rtype);
+	json_object_add_value_int(root, "regctl", regctl);
 	json_object_add_value_int(root, "ptpls", status->ptpls);
 
 	rcs = json_create_array();
-	json_object_add_value_array(root, "regctls", rcs);
+        /* check Extended Data Structure bit */
+        if ((cdw11 & 0x1) == 0) {
+                /* if status buffer was too small, don't loop past the end of the buffer */
+                entries = (bytes - 24) / 24;
+                if (entries < regctl)
+                        regctl = entries;
 
-	for (i = 0; i < regctl; i++) {
-		struct json_object *rc = json_create_object();
+		json_object_add_value_array(root, "regctls", rcs);
+		for (i = 0; i < regctl; i++) {
+			struct json_object *rc = json_create_object();
 
-		json_object_add_value_int(rc, "cntlid", le16_to_cpu(status->regctl_ds[i].cntlid));
-		json_object_add_value_int(rc, "rcsts", status->regctl_ds[i].rcsts);
-		json_object_add_value_int(rc, "hostid", (uint64_t)le64_to_cpu(status->regctl_ds[i].hostid));
-		json_object_add_value_int(rc, "rkey", (uint64_t)le64_to_cpu(status->regctl_ds[i].rkey));
+			json_object_add_value_int(rc, "cntlid", le16_to_cpu(status->regctl_ds[i].cntlid));
+			json_object_add_value_int(rc, "rcsts", status->regctl_ds[i].rcsts);
+			json_object_add_value_int(rc, "hostid", (uint64_t)le64_to_cpu(status->regctl_ds[i].hostid));
+			json_object_add_value_int(rc, "rkey", (uint64_t)le64_to_cpu(status->regctl_ds[i].rkey));
 
-		json_array_add_value_object(rcs, rc);
+			json_array_add_value_object(rcs, rc);
+		}
+	} else {
+		struct nvme_reservation_status_ext *ext_status = (struct nvme_reservation_status_ext *)status;
+		char	hostid[33];
+
+                /* if status buffer was too small, don't loop past the end of the buffer */
+                entries = (bytes - 64) / 64;
+                if (entries < regctl)
+                        regctl = entries;
+
+		json_object_add_value_array(root, "regctlext", rcs);
+		for (i = 0; i < regctl; i++) {
+			struct json_object *rc = json_create_object();
+
+			json_object_add_value_int(rc, "cntlid", le16_to_cpu(ext_status->regctl_eds[i].cntlid));
+			json_object_add_value_int(rc, "rcsts", ext_status->regctl_eds[i].rcsts);
+			json_object_add_value_int(rc, "rkey", (uint64_t)le64_to_cpu(ext_status->regctl_eds[i].rkey));
+			for (j = 0; j < 16; j++)
+				sprintf(hostid + j * 2, "%02x", ext_status->regctl_eds[i].hostid[j]);
+
+			json_object_add_value_string(rc, "hostid", hostid);
+
+			json_array_add_value_object(rcs, rc);
+		}
 	}
 
 	json_print_object(root, NULL);
@@ -1518,6 +1697,8 @@ void json_fw_log(struct nvme_firmware_log_page *fw_log, const char *devname)
 void json_smart_log(struct nvme_smart_log *smart, unsigned int nsid, const char *devname)
 {
 	struct json_object *root;
+	int c;
+	char key[21];
 
 	unsigned int temperature = ((smart->temperature[1] << 8) |
 		smart->temperature[0]);
@@ -1554,6 +1735,24 @@ void json_smart_log(struct nvme_smart_log *smart, unsigned int nsid, const char 
 			le32_to_cpu(smart->warning_temp_time));
 	json_object_add_value_int(root, "critical_comp_time",
 			le32_to_cpu(smart->critical_comp_time));
+
+	for (c=0; c < 8; c++) {
+		__s32 temp = le16_to_cpu(smart->temp_sensor[c]);
+
+		if (temp == 0)
+			continue;
+		sprintf(key, "temperature_sensor_%d",c+1);
+		json_object_add_value_int(root, key, temp);
+	}
+
+	json_object_add_value_int(root, "thm_temp1_trans_count",
+			le32_to_cpu(smart->thm_temp1_trans_count));
+	json_object_add_value_int(root, "thm_temp2_trans_count",
+			le32_to_cpu(smart->thm_temp2_trans_count));
+	json_object_add_value_int(root, "thm_temp1_total_time",
+			le32_to_cpu(smart->thm_temp1_total_time));
+	json_object_add_value_int(root, "thm_temp2_total_time",
+			le32_to_cpu(smart->thm_temp2_total_time));
 
 	json_print_object(root, NULL);
 	printf("\n");

@@ -20,12 +20,13 @@ uint64_t int48_to_long(__u8 *data);
 void __show_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode, void (*vendor_show)(__u8 *vs, struct json_object *root));
 void show_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode);
 void show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int flags);
-void show_nvme_resv_report(struct nvme_reservation_status *status);
+void show_nvme_resv_report(struct nvme_reservation_status *status, int bytes, __u32 cdw11);
 void show_lba_range(struct nvme_lba_range_type *lbrt, int nr_ranges);
 void show_error_log(struct nvme_error_log_page *err_log, int entries, const char *devname);
 void show_smart_log(struct nvme_smart_log *smart, unsigned int nsid, const char *devname);
 void show_fw_log(struct nvme_firmware_log_page *fw_log, const char *devname);
 void show_ctrl_registers(void *bar, unsigned int mode);
+void show_nvme_id_ns_descs(void *data);
 
 void nvme_feature_show_fields(__u32 fid, unsigned int result, unsigned char *buf);
 char *nvme_status_to_string(__u32 status);
@@ -34,11 +35,12 @@ char *nvme_feature_to_string(int feature);
 
 void json_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode, void (*vendor_show)(__u8 *vs, struct json_object *root));
 void json_nvme_id_ns(struct nvme_id_ns *ns, unsigned int flags);
-void json_nvme_resv_report(struct nvme_reservation_status *status);
+void json_nvme_resv_report(struct nvme_reservation_status *status, int bytes, __u32 cdw11);
 void json_error_log(struct nvme_error_log_page *err_log, int entries, const char *devname);
 void json_smart_log(struct nvme_smart_log *smart, unsigned int nsid, const char *devname);
 void json_fw_log(struct nvme_firmware_log_page *fw_log, const char *devname);
 void json_print_list_items(struct list_item *items, unsigned amnt);
+void json_nvme_id_ns_descs(void *data);
 
 
 #endif

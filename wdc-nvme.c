@@ -560,6 +560,9 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
 		strncpy(f, cfg.file, PATH_MAX);
@@ -677,6 +680,9 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
 		strncpy(f, cfg.file, PATH_MAX);
@@ -710,6 +716,9 @@ static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
 	wdc_check_device(fd);
 	ret = wdc_crash_dump(fd, cfg.file);
 	if (ret != 0) {
@@ -784,6 +793,9 @@ static int wdc_purge(int argc, char **argv,
 	admin_cmd.opcode = WDC_NVME_PURGE_CMD_OPCODE;
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
 	wdc_check_device(fd);
 	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
 	if (ret > 0) {
@@ -828,6 +840,9 @@ static int wdc_purge_monitor(int argc, char **argv,
 	admin_cmd.timeout_ms = WDC_NVME_PURGE_MONITOR_TIMEOUT;
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
 	wdc_check_device(fd);
 	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
 	if (ret == 0) {
@@ -1116,7 +1131,7 @@ static void wdc_print_log_json(struct wdc_ssd_perf_stats *perf)
 			(uint64_t)le64_to_cpu(perf->nw_blks));
 	json_object_add_value_int(root, "Average NAND Write Size",
 			safe_div_fp((le64_to_cpu(perf->nw_blks)), (le64_to_cpu(perf->nw_cmds))));
-	json_object_add_value_int(root, "NAND Read Before Writen",
+	json_object_add_value_int(root, "NAND Read Before Written",
 			(uint64_t)le64_to_cpu(perf->nrbw));
 	json_print_object(root, NULL);
 	printf("\n");
@@ -1287,6 +1302,9 @@ static int wdc_smart_log_add_c1(int argc, char **argv, struct command *command,
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
 	wdc_check_device(fd);
 	fmt = validate_output_format(cfg.output_format);
 	if (fmt < 0) {

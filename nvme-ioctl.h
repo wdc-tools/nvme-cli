@@ -62,7 +62,7 @@ int nvme_resv_register(int fd, __u32 nsid, __u8 rrega, __u8 cptpl,
 		       bool iekey, __u64 crkey, __u64 nrkey);
 int nvme_resv_release(int fd, __u32 nsid, __u8 rtype, __u8 rrela,
 		      bool iekey, __u64 crkey);
-int nvme_resv_report(int fd, __u32 nsid, __u32 numd, void *data);
+int nvme_resv_report(int fd, __u32 nsid, __u32 numd, __u32 cdw11, void *data);
 
 /* NVME_ADMIN_CMD */
 int nvme_passthru_admin(int fd, __u8 opcode, __u8 flags, __u16 rsvd,
@@ -77,6 +77,7 @@ int nvme_identify_ctrl(int fd, void *data);
 int nvme_identify_ns(int fd, __u32 nsid, bool present, void *data);
 int nvme_identify_ns_list(int fd, __u32 nsid, bool all, void *data);
 int nvme_identify_ctrl_list(int fd, __u32 nsid, __u16 cntid, void *data);
+int nvme_identify_ns_descs(int fd, __u32 nsid, void *data);
 
 int nvme_get_log(int fd, __u32 nsid, __u8 log_id, __u32 data_len, void *data);
 int nvme_fw_log(int fd, struct nvme_firmware_log_page *fw_log);
