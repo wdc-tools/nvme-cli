@@ -1076,7 +1076,7 @@ static int wdc_print_ca_log(struct wdc_ssd_ca_perf_stats *perf, int fmt)
 	return 0;
 }
 
-static int wdc_smart_log_add_c1(int argc, char **argv, struct command *command,
+static int wdc_smart_add_log_c1(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	char *desc = "Retrieve additional performance statistics.";
@@ -1157,7 +1157,7 @@ static int wdc_smart_log_add_c1(int argc, char **argv, struct command *command,
 	return ret;
 }
 
-static int wdc_smart_log_add(int argc, char **argv, struct command *command,
+static int wdc_smart_add_log(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	char *desc = "Retrieve additional performance statistics.";
