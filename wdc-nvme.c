@@ -41,6 +41,7 @@
 #include <sys/ioctl.h>
 #define CREATE_CMD
 #include "wdc-nvme.h"
+#include "wdc-utils.h"
 
 #define WRITE_SIZE	(sizeof(__u8) * 4096)
 
@@ -50,8 +51,10 @@
 
 /* Device Config */
 #define WDC_NVME_WDC_VID		        0x1c58
-#define WDC_NVME_WDC_SN100_DEV_ID		0x0003
-#define WDC_NVME_WDC_SN200_DEV_ID		0x0023
+#define WDC_NVME_WDC_SN100_CNTRL_ID		0x0003
+#define WDC_NVME_WDC_SN200_CNTRL_ID		0x0023
+#define WDC_NVME_SNDK_VID		        0x15b7
+#define WDC_NVME_SNDK_CNTRL_ID			0x0000
 
 /* Capture Diagnostics */
 #define WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE	WDC_NVME_LOG_SIZE_DATA_LEN
@@ -121,6 +124,164 @@
 /* CA Log Page */
 #define WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE			0xCA
 #define WDC_CA_LOG_BUF_LEN							0x80
+
+/* Drive Essentials */
+#define WDC_DE_DEFAULT_NUMBER_OF_ERROR_ENTRIES		64
+#define WDC_DE_GENERIC_BUFFER_SIZE					80
+#define WDC_DE_GLOBAL_NSID							0xFFFFFFFF
+#define WDC_DE_DEFAULT_NAMESPACE_ID					0x01
+#define WDC_DE_PATH_SEPARATOR						"/"
+#define WDC_DE_TAR_FILES							"*.bin"
+#define WDC_DE_TAR_FILE_EXTN						".tar.gz"
+#define WDC_DE_TAR_CMD								"tar -czf"
+
+/* VU Opcodes */
+#define WDC_DE_VU_READ_SIZE_OPCODE					0xC0
+#define WDC_DE_VU_READ_BUFFER_OPCODE				0xC2
+
+#define WDC_DE_FILE_HEADER_SIZE                     4
+#define WDC_DE_FILE_OFFSET_SIZE                     2
+#define WDC_DE_FILE_NAME_SIZE                       32
+#define WDC_DE_VU_READ_BUFFER_STANDARD_OFFSET		0x8000
+#define WDC_DE_READ_MAX_TRANSFER_SIZE				0x8000
+
+#define WDC_DE_MANUFACTURING_INFO_PAGE_FILE_NAME	"manufacturing_info"  /* Unique log entry page name. */
+#define WDC_DE_CORE_DUMP_FILE_NAME					"core_dump"
+#define WDC_DE_EVENT_LOG_FILE_NAME					"event_log"
+#define WDC_DE_DESTN_SPI							1
+#define WDC_DE_DUMPTRACE_DESTINATION				6
+
+typedef enum _NVME_FEATURES_SELECT
+{
+    FS_CURRENT                      = 0,
+    FS_DEFAULT                      = 1,
+    FS_SAVED                        = 2,
+    FS_SUPPORTED_CAPBILITIES        = 3
+} NVME_FEATURES_SELECT;
+
+typedef enum _NVME_FEATURE_IDENTIFIERS
+{
+    FID_ARBITRATION                                 = 0x01,
+    FID_POWER_MANAGEMENT                            = 0x02,
+    FID_LBA_RANGE_TYPE                              = 0x03,
+    FID_TEMPERATURE_THRESHOLD                       = 0x04,
+    FID_ERROR_RECOVERY                              = 0x05,
+    FID_VOLATILE_WRITE_CACHE                        = 0x06,
+    FID_NUMBER_OF_QUEUES                            = 0x07,
+    FID_INTERRUPT_COALESCING                        = 0x08,
+    FID_INTERRUPT_VECTOR_CONFIGURATION              = 0x09,
+    FID_WRITE_ATOMICITY                             = 0x0A,
+    FID_ASYNCHRONOUS_EVENT_CONFIGURATION            = 0x0B,
+    FID_AUTONOMOUS_POWER_STATE_TRANSITION           = 0x0C,
+/*Below FID's are NVM Command Set Specific*/
+    FID_SOFTWARE_PROGRESS_MARKER                    = 0x80,
+    FID_HOST_IDENTIFIER                             = 0x81,
+    FID_RESERVATION_NOTIFICATION_MASK               = 0x82,
+    FID_RESERVATION_PERSISTENCE                     = 0x83
+} NVME_FEATURE_IDENTIFIERS;
+
+typedef enum
+{
+	WDC_DE_TYPE_IDENTIFY            = 0x1,
+	WDC_DE_TYPE_SMARTATTRIBUTEDUMP  = 0x2,
+	WDC_DE_TYPE_EVENTLOG            = 0x4,
+	WDC_DE_TYPE_DUMPTRACE           = 0x8,
+	WDC_DE_TYPE_DUMPSNAPSHOT        = 0x10,
+	WDC_DE_TYPE_ATA_LOGS            = 0x20,
+	WDC_DE_TYPE_SMART_LOGS          = 0x40,
+	WDC_DE_TYPE_SCSI_LOGS           = 0x80,
+	WDC_DE_TYPE_SCSI_MODE_PAGES     = 0x100,
+	WDC_DE_TYPE_NVMe_FEATURES       = 0x200,
+	WDC_DE_TYPE_DUMPSMARTERRORLOG3  = 0x400,
+	WDC_DE_TYPE_DUMPLOG3E           = 0x800,
+	WDC_DE_TYPE_DUMPSCRAM           = 0x1000,
+	WDC_DE_TYPE_PCU_LOG             = 0x2000,
+	WDC_DE_TYPE_DUMP_ERROR_LOGS     = 0x4000,
+	WDC_DE_TYPE_FW_SLOT_LOGS        = 0x8000,
+	WDC_DE_TYPE_MEDIA_SETTINGS      = 0x10000,
+	WDC_DE_TYPE_SMART_DATA          = 0x20000,
+	WDC_DE_TYPE_NVME_SETTINGS       = 0x40000,
+	WDC_DE_TYPE_NVME_ERROR_LOGS     = 0x80000,
+	WDC_DE_TYPE_NVME_LOGS           = 0x100000,
+	WDC_DE_TYPE_UART_LOGS           = 0x200000,
+	WDC_DE_TYPE_DLOGS_SPI           = 0x400000,
+	WDC_DE_TYPE_DLOGS_RAM           = 0x800000,
+	WDC_DE_TYPE_NVME_MANF_INFO      = 0x2000000,
+	WDC_DE_TYPE_NONE                = 0x1000000,
+	WDC_DE_TYPE_ALL                 = 0xFFFFFFF,
+} WDC_DRIVE_ESSENTIAL_TYPE;
+
+typedef struct __attribute__((__packed__)) _WDC_DE_VU_FILE_META_DATA
+{
+    __u8 fileName[WDC_DE_FILE_NAME_SIZE];
+    __u16 fileID;
+    __u64 fileSize;
+} WDC_DE_VU_FILE_META_DATA, *PWDC_DE_VU_FILE_META_DATA;
+
+typedef struct _WDC_DRIVE_ESSENTIALS
+{
+    WDC_DE_VU_FILE_META_DATA metaData;
+    WDC_DRIVE_ESSENTIAL_TYPE essentialType;
+} WDC_DRIVE_ESSENTIALS;
+
+typedef struct _WDC_DE_VU_LOG_DIRECTORY
+{
+    WDC_DRIVE_ESSENTIALS *logEntry;		/* Caller to allocate memory        */
+    __u32 maxNumLogEntries; 			/* Caller to input memory allocated */
+    __u32 numOfValidLogEntries;			/* API will output this value       */
+} WDC_DE_VU_LOG_DIRECTORY,*PWDC_DE_VU_LOG_DIRECTORY;
+
+typedef struct _WDC_DE_CSA_FEATURE_ID_LIST
+{
+    NVME_FEATURE_IDENTIFIERS featureId;
+    __u8 featureName[WDC_DE_GENERIC_BUFFER_SIZE];
+} WDC_DE_CSA_FEATURE_ID_LIST;
+
+WDC_DE_CSA_FEATURE_ID_LIST deFeatureIdList[] =
+{
+	{0x00                                   , "Dummy Placeholder"},
+	{FID_ARBITRATION                        , "Arbitration"},
+	{FID_POWER_MANAGEMENT                   , "PowerMgmnt"},
+	{FID_LBA_RANGE_TYPE                     , "LbaRangeType"},
+	{FID_TEMPERATURE_THRESHOLD              , "TempThreshold"},
+	{FID_ERROR_RECOVERY                     , "ErrorRecovery"},
+	{FID_VOLATILE_WRITE_CACHE               , "VolatileWriteCache"},
+	{FID_NUMBER_OF_QUEUES                   , "NumOfQueues"},
+	{FID_INTERRUPT_COALESCING               , "InterruptCoalesing"},
+	{FID_INTERRUPT_VECTOR_CONFIGURATION     , "InterruptVectorConfig"},
+	{FID_WRITE_ATOMICITY                    , "WriteAtomicity"},
+	{FID_ASYNCHRONOUS_EVENT_CONFIGURATION   , "AsynEventConfig"},
+	{FID_AUTONOMOUS_POWER_STATE_TRANSITION  , "AutonomousPowerState"},
+};
+
+typedef enum _NVME_VU_DE_LOGPAGE_NAMES
+{
+    NVME_DE_LOGPAGE_E3 = 0x01,
+    NVME_DE_LOGPAGE_C0 = 0x02
+} NVME_VU_DE_LOGPAGE_NAMES;
+typedef struct _NVME_VU_DE_LOGPAGE_LIST
+{
+    NVME_VU_DE_LOGPAGE_NAMES logPageName;
+    __u32 logPageId;
+    __u32 logPageLen;
+    char  logPageIdStr[4];
+} NVME_VU_DE_LOGPAGE_LIST, *PNVME_VU_DE_LOGPAGE_LIST;
+
+typedef struct _WDC_NVME_DE_VU_LOGPAGES
+{
+    NVME_VU_DE_LOGPAGE_NAMES vuLogPageReqd;
+    __u32 numOfVULogPages;
+} WDC_NVME_DE_VU_LOGPAGES, *PWDC_NVME_DE_VU_LOGPAGES;
+
+NVME_VU_DE_LOGPAGE_LIST deVULogPagesList[] =
+{
+    { NVME_DE_LOGPAGE_E3, 0xE3, 1072, "0xe3"},
+    { NVME_DE_LOGPAGE_C0, 0xC0, 512, "0xc0"}
+};
+
+/* VU Drive Lock/Unlock Feature */
+#define WDC_DE_VU_UNLOCK_FEATURE_IDENTIFIER     0xC0
+#define WDC_DE_VU_LOCK_PASSPHRASE              "gevt" /*used to Lock the drive by sending a bad key */
 
 static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix);
 static int wdc_create_log_file(char *file, __u8 *drive_log_data,
@@ -260,10 +421,14 @@ static int wdc_check_device(int fd)
 		return -1;
 	}
 	ret = -1;
+
 	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_WDC_VID) &&
-		((le32_to_cpu(ctrl.cntlid) == WDC_NVME_WDC_SN100_DEV_ID) ||
-		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_WDC_SN200_DEV_ID)))
+		((le32_to_cpu(ctrl.cntlid) == WDC_NVME_WDC_SN100_CNTRL_ID) ||
+		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_WDC_SN200_CNTRL_ID)))
+		ret = 0;
+	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
+			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SNDK_CNTRL_ID))
 		ret = 0;
 	else
 		fprintf(stderr, "WARNING : WDC : Device not supported\n");
