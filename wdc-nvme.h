@@ -16,6 +16,7 @@ PLUGIN(NAME("wdc", "Western Digital vendor specific extensions"),
 		ENTRY("purge-monitor", "WDC Purge Monitor", wdc_purge_monitor)
 		ENTRY("smart-log-add", "WDC Additional Smart Log", wdc_smart_log_add)
 		ENTRY("smart-log-add-c1", "WDC Additional Smart Log for C1 Log page", wdc_smart_log_add_c1)
+		ENTRY("clear-pcie-correctable-errors", "WDC Clear PCIe Correctable Error Count", wdc_clear_pcie_correctable_errors)
 	)
 );
 
