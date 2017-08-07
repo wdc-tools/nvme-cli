@@ -1,13 +1,22 @@
 '\" t
-.\"     Title: nvme-wdc-smart-log-add-c1
+.\"     Title: nvme-wdc-vs-smart-add-log-c1
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 07/06/2017
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 08/07/2017
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-SMART\-LO" "1" "07/06/2017" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-VS\-SMART" "1" "08/07/2017" "NVMe" "NVMe Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -19,15 +28,15 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-nvme-wdc-smart-log-add-c1 \- Send NVMe WDC smart\-log\-add\-c1 Vendor Unique Command, return result
+nvme-wdc-vs-smart-add-log-c1 \- Send NVMe WDC vs\-smart\-add\-log\-c1 Vendor Unique Command, return result
 .SH "SYNOPSIS"
 .sp
 .nf
-\fInvme wdc smart\-log\-add\-c1\fR <device> [\-\-interval=<NUM>, \-i <NUM>] [\-\-output\-format=<normal|json> \-o <normal|json>]
+\fInvme wdc vs\-smart\-add\-log\-c1\fR <device> [\-\-interval=<NUM>, \-i <NUM>] [\-\-output\-format=<normal|json> \-o <normal|json>]
 .fi
 .SH "DESCRIPTION"
 .sp
-For the NVMe device given, send a Vendor Unique WDC smart\-log\-add\-c1 command and provide the additional smart log\&. The \-\-interval option will return performance statistics from the specified reporting interval\&.
+For the NVMe device given, send a Vendor Unique WDC vs\-smart\-add\-log\-c1 command and provide the additional smart log\&. The \-\-interval option will return performance statistics from the specified reporting interval\&.
 .sp
 The <device> parameter is mandatory and may be either the NVMe character device (ex: /dev/nvme0)\&.
 .sp
@@ -51,18 +60,18 @@ Set the reporting format to
 Valid Interval values and description :\-
 .TS
 allbox tab(:);
-ctB ctB.
+ltB ltB.
 T{
 Value
 T}:T{
 Description
 T}
 .T&
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct.
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt.
 T{
 .sp
 \fB1\fR
@@ -103,38 +112,38 @@ T}
 .SH "OUTPUT EXPLANATION"
 .TS
 allbox tab(:);
-ctB ctB.
+ltB ltB.
 T{
 Field
 T}:T{
 Description
 T}
 .T&
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct
-ct ct.
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt.
 T{
 .sp
 \fBHost Read Commands\fR
@@ -322,13 +331,13 @@ T}
 .sp -1
 .IP \(bu 2.3
 .\}
-Has the program issue WDC smart\-log\-add\-c1 Vendor Unique Command with default interval (14) :
+Has the program issue WDC vs\-smart\-add\-log\-c1 Vendor Unique Command with default interval (14) :
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-# nvme wdc smart\-log\-add\-c1 /dev/nvme0
+# nvme wdc vs\-smart\-add\-log\-c1 /dev/nvme0
 .fi
 .if n \{\
 .RE

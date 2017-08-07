@@ -1,0 +1,226 @@
+'\" t
+.\"     Title: nvme-wdc-vs-smart-add-log
+.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 08/07/2017
+.\"    Manual: NVMe Manual
+.\"    Source: NVMe
+.\"  Language: English
+.\"
+.TH "NVME\-WDC\-VS\-SMART" "1" "08/07/2017" "NVMe" "NVMe Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+nvme-wdc-vs-smart-add-log \- Send NVMe WDC vs\-smart\-add\-log Vendor Unique Command, return result
+.SH "SYNOPSIS"
+.sp
+.nf
+\fInvme wdc vs\-smart\-add\-log\fR <device> [\-\-output\-format=<normal|json> \-o <normal|json>]
+.fi
+.SH "DESCRIPTION"
+.sp
+For the NVMe device given, send a Vendor Unique WDC vs\-smart\-add\-log command and provide the additional smart CA log\&.
+.sp
+The <device> parameter is mandatory and may be either the NVMe character device (ex: /dev/nvme0)\&.
+.sp
+This will only work on WDC devices supporting this feature\&. Results for any other device are undefined\&.
+.sp
+On success it returns 0, error code otherwise\&.
+.SH "OPTIONS"
+.PP
+\-o <format>, \-\-output\-format=<format>
+.RS 4
+Set the reporting format to
+\fIhuman\fR, or
+\fIjson\fR\&. Only one output format can be used at a time\&. Default is human\&.
+.RE
+.SH "OUTPUT EXPLANATION"
+.TS
+allbox tab(:);
+ltB ltB.
+T{
+Field
+T}:T{
+Description
+T}
+.T&
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt
+lt lt.
+T{
+.sp
+\fBPhysical NAND bytes written\&.\fR
+T}:T{
+.sp
+The number of bytes written to NAND\&. 16 bytes \- hi/lo
+T}
+T{
+.sp
+\fBPhysical NAND bytes read\fR
+T}:T{
+.sp
+The number of bytes read from NAND\&. 16 bytes \- hi/lo
+T}
+T{
+.sp
+\fBBad NAND Block Count\fR
+T}:T{
+.sp
+Raw and normalized count of the number of NAND blocks that have been retired after the drives manufacturing tests (i\&.e\&. grown back blocks)\&. 2 bytes normalized, 6 bytes raw count
+T}
+T{
+.sp
+\fBUncorrectable Read Error Count\fR
+T}:T{
+.sp
+Total count of NAND reads that were not correctable by read retries, all levels of ECC, or XOR (as applicable)\&. 8 bytes
+T}
+T{
+.sp
+\fBSoft ECC Error Count\fR
+T}:T{
+.sp
+Total count of NAND reads that were not correctable by read retries, or first\-level ECC\&. 8 bytes
+T}
+T{
+.sp
+\fBSSD End to End Detection Count\fR
+T}:T{
+.sp
+A count of the detected errors by the SSD end to end error correction which includes DRAM, SRAM, or other storage element ECC/CRC protection mechanism (not NAND ECC)\&. 4 bytes
+T}
+T{
+.sp
+\fBSSD End to End Correction Count\fR
+T}:T{
+.sp
+A count of the corrected errors by the SSD end to end error correction which includes DRAM, SRAM, or other storage element ECC/CRC protection mechanism (not NAND ECC)\&. 4 bytes
+T}
+T{
+.sp
+\fBSystem Data % Used\fR
+T}:T{
+.sp
+A normalized cumulative count of the number of erase cycles per block since leaving the factory for the system (FW and metadata) area\&. Starts at 0 and increments\&. 100 indicates that the estimated endurance has been consumed\&.
+T}
+T{
+.sp
+\fBUser Data Max Erase Count\fR
+T}:T{
+.sp
+The maximum erase count across all NAND blocks in the drive\&. 4 bytes
+T}
+T{
+.sp
+\fBUser Data Min Erase Count\fR
+T}:T{
+.sp
+The minimum erase count across all NAND blocks in the drive\&. 4 bytes
+T}
+T{
+.sp
+\fBRefresh Count\fR
+T}:T{
+.sp
+A count of the number of blocks that have been re\-allocated due to background operations only\&. 8 bytes
+T}
+T{
+.sp
+\fBProgram Fail Count\fR
+T}:T{
+.sp
+Raw and normalized count of total program failures\&. Normalized count starts at 100 and shows the percent of remaining allowable failures\&. 2 bytes normalized, 6 bytes raw count
+T}
+T{
+.sp
+\fBUser Data Erase Fail Count\fR
+T}:T{
+.sp
+Raw and normalized count of total erase failures in the user area\&. Normalized count starts at 100 and shows the percent of remaining allowable failures\&. 2 bytes normalized, 6 bytes raw count
+T}
+T{
+.sp
+\fBSystem Area Erase Fail Count\fR
+T}:T{
+.sp
+Raw and normalized count of total erase failures in the system area\&. Normalized count starts at 100 and shows the percent of remaining allowable failures\&. 2 bytes normalized, 6 bytes raw count
+T}
+T{
+.sp
+\fBThermal Throttling Status\fR
+T}:T{
+.sp
+The current status of thermal throttling (enabled or disabled)\&. 2 bytes
+T}
+T{
+.sp
+\fBThermal Throttling Count\fR
+T}:T{
+.sp
+A count of the number of thermal throttling events\&. 2 bytes
+T}
+T{
+.sp
+\fBPCIe Correctable Error Count\fR
+T}:T{
+.sp
+Summation counter of all PCIe correctable errors (Bad TLP, Bad DLLP, Receiver error, Replay timeouts, Replay rollovers)\&. 8 bytes
+T}
+.TE
+.sp 1
+.SH "EXAMPLES"
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Has the program issue WDC vs\-smart\-add\-log Vendor Unique Command :
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# nvme wdc vs\-smart\-add\-log /dev/nvme0
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.SH "NVME"
+.sp
+Part of the nvme\-user suite\&.
