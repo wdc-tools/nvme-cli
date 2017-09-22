@@ -122,14 +122,29 @@ static void show_nvme_id_ctrl_ctratt(__le32 ctrl_ctratt)
 static void show_nvme_id_ctrl_oacs(__le16 ctrl_oacs)
 {
 	__u16 oacs = le16_to_cpu(ctrl_oacs);
-	__u16 rsvd = (oacs & 0xFFF0) >> 4;
+	__u16 rsvd = (oacs & 0xFE00) >> 9;
+	__u16 dbc = (oacs & 0x100) >> 8;
+	__u16 vir = (oacs & 0x80) >> 7;
+	__u16 nmi = (oacs & 0x40) >> 6;
+	__u16 dir = (oacs & 0x20) >> 5;
+	__u16 sft = (oacs & 0x10) >> 4;
 	__u16 nsm = (oacs & 0x8) >> 3;
 	__u16 fwc = (oacs & 0x4) >> 2;
 	__u16 fmt = (oacs & 0x2) >> 1;
 	__u16 sec = oacs & 0x1;
 
 	if (rsvd)
-		printf(" [15:4] : %#x\tReserved\n", rsvd);
+		printf(" [15:9] : %#x\tReserved\n", rsvd);
+	printf("  [8:8] : %#x\tDoorbell Buffer Config %sSupported\n",
+		dbc, dbc ? "" : "Not ");
+	printf("  [7:7] : %#x\tVirtualization Management %sSupported\n",
+		vir, vir ? "" : "Not ");
+	printf("  [6:6] : %#x\tNVMe-MI Send and Receive %sSupported\n",
+		nmi, nmi ? "" : "Not ");
+	printf("  [5:5] : %#x\tDirectives %sSupported\n",
+		dir, dir ? "" : "Not ");
+	printf("  [4:4] : %#x\tDevice Self-test %sSupported\n",
+		sft, sft ? "" : "Not ");
 	printf("  [3:3] : %#x\tNS Management and Attachment %sSupported\n",
 		nsm, nsm ? "" : "Not ");
 	printf("  [2:2] : %#x\tFW Commit and Download %sSupported\n",
@@ -267,7 +282,8 @@ static void show_nvme_id_ctrl_cqes(__u8 cqes)
 static void show_nvme_id_ctrl_oncs(__le16 ctrl_oncs)
 {
 	__u16 oncs = le16_to_cpu(ctrl_oncs);
-	__u16 rsvd = (oncs & 0xFFC0) >> 6;
+	__u16 rsvd = (oncs & 0xFF80) >> 7;
+	__u16 tmst = (oncs & 0x40) >> 6;
 	__u16 resv = (oncs & 0x20) >> 5;
 	__u16 save = (oncs & 0x10) >> 4;
 	__u16 wzro = (oncs & 0x8) >> 3;
@@ -277,6 +293,8 @@ static void show_nvme_id_ctrl_oncs(__le16 ctrl_oncs)
 
 	if (rsvd)
 		printf(" [15:6] : %#x\tReserved\n", rsvd);
+	printf("  [6:6] : %#x\tTimestamp %sSupported\n",
+		tmst, tmst ? "" : "Not ");
 	printf("  [5:5] : %#x\tReservations %sSupported\n",
 		resv, resv ? "" : "Not ");
 	printf("  [4:4] : %#x\tSave and Select %sSupported\n",
@@ -1242,6 +1260,57 @@ static void show_host_mem_buffer(struct nvme_host_mem_buffer *hmb)
 	printf("\tHost Memory Buffer Size                  (HSIZE): %u\n", hmb->hsize);
 }
 
+void nvme_directive_show_fields(__u8 dtype, __u8 doper, unsigned int result, unsigned char *buf)
+{
+        __u8 *field = buf;
+        int count, i;
+        switch (dtype) {
+        case NVME_DIR_IDENTIFY:
+                switch (doper) {
+                case NVME_DIR_RCV_ID_OP_PARAM:
+                        printf("\tDirective support \n");
+                        printf("\t\tIdentify Directive  : %s\n", (*field & 0x1) ? "supported":"not supported");
+                        printf("\t\tStream Directive    : %s\n", (*field & 0x2) ? "supported":"not supported");
+                        printf("\tDirective status \n");
+                        printf("\t\tIdentify Directive  : %s\n", (*(field + 32) & 0x1) ? "enabled" : "disabled");
+                        printf("\t\tStream Directive    : %s\n", (*(field + 32) & 0x2) ? "enabled" : "disabled");
+                        break;
+                default:
+                        fprintf(stderr, "invalid directive operations for Identify Directives\n");
+                }
+                break;
+        case NVME_DIR_STREAMS:
+                switch (doper) {
+                case NVME_DIR_RCV_ST_OP_PARAM:
+                        printf("\tMax Streams Limit                          (MSL): %u\n", *(__u16 *) field);
+                        printf("\tNVM Subsystem Streams Available           (NSSA): %u\n", *(__u16 *) (field + 2));
+                        printf("\tNVM Subsystem Streams Open                (NSSO): %u\n", *(__u16 *) (field + 4));
+                        printf("\tStream Write Size (in unit of LB size)     (SWS): %u\n", *(__u32 *) (field + 16));
+                        printf("\tStream Granularity Size (in unit of SWS)   (SGS): %u\n", *(__u16 *) (field + 20));
+                        printf("\tNamespece Streams Allocated                (NSA): %u\n", *(__u16 *) (field + 22));
+                        printf("\tNamespace Streams Open                     (NSO): %u\n", *(__u16 *) (field + 24));
+                        break;
+                case NVME_DIR_RCV_ST_OP_STATUS:
+                        count = *(__u16 *) field;
+                        printf("\tOpen Stream Count  : %u\n", *(__u16 *) field);
+                        for ( i = 0; i < count; i++ ) {
+                                printf("\tStream Identifier %.6u : %u\n", i + 1, *(__u16 *) (field + ((i + 1) * 2)));
+                        }
+                        break;
+                case NVME_DIR_RCV_ST_OP_RESOURCE:
+                        printf("\tNamespace Streams Allocated (NSA): %u\n", result & 0xffff);
+                        break;
+                default:
+                        fprintf(stderr, "invalid directive operations for Streams Directives\n");
+                }
+                break;
+        default:
+                fprintf(stderr, "invalid directive type\n");
+                break;
+        }
+        return;
+}
+
 void nvme_feature_show_fields(__u32 fid, unsigned int result, unsigned char *buf)
 {
 	__u8 field;
@@ -1273,7 +1342,7 @@ void nvme_feature_show_fields(__u32 fid, unsigned int result, unsigned char *buf
 		printf("\tThreshold Type Select         (THSEL): %u - %s\n", field, nvme_feature_temp_type_to_string(field));
 		field = (result & 0x000f0000) >> 16;
 		printf("\tThreshold Temperature Select (TMPSEL): %u - %s\n", field, nvme_feature_temp_sel_to_string(field));
-		printf("\tTemperature Threshold         (TMPTH): %u C\n", (result & 0x0000ffff) - 273);
+		printf("\tTemperature Threshold         (TMPTH): %d C\n", (result & 0x0000ffff) - 273);
 		break;
 	case NVME_FEAT_ERR_RECOVERY:
 		printf("\tDeallocated or Unwritten Logical Block Error Enable (DULBE): %s\n", ((result & 0x00010000) >> 16) ? "Enabled":"Disabled");
@@ -1856,8 +1925,8 @@ static void show_registers_csts(__u32 csts)
 
 static void show_registers_aqa(__u32 aqa)
 {
-	printf("\tAdmin Completion Queue Size (ACQS): %u bytes\n", ((aqa & 0x0fff0000) >> 16)+1);
-	printf("\tAdmin Submission Queue Size (ASQS): %u bytes\n\n", (aqa & 0x00000fff)+1);
+	printf("\tAdmin Completion Queue Size (ACQS): %u\n", ((aqa & 0x0fff0000) >> 16)+1);
+	printf("\tAdmin Submission Queue Size (ASQS): %u\n\n", (aqa & 0x00000fff)+1);
 
 }
 
