@@ -218,7 +218,7 @@ static void show_nvme_id_ctrl_rpmbs(__le32 ctrl_rpmbs)
 	__u32 tsz = (rpmbs & 0xFF0000) >> 16;
 	__u32 rsvd = (rpmbs & 0xFFC0) >> 6;
 	__u32 auth = (rpmbs & 0x38) >> 3;
-	__u32 rpmb = rpmbs & 0x3;
+	__u32 rpmb = rpmbs & 0x7;
 
 	printf(" [31:24]: %#x\tAccess Size\n", asz);
 	printf(" [23:16]: %#x\tTotal Size\n", tsz);
@@ -1006,6 +1006,23 @@ void show_fw_log(struct nvme_firmware_log_page *fw_log, const char *devname)
 						fw_to_string(fw_log->frs[i]));
 }
 
+void show_effects_log(struct nvme_effects_log_page *effects)
+{
+	int i;
+	__u32 effect;
+
+	for (i = 0; i < 256; i++) {
+		effect = le32_to_cpu(effects->acs[i]);
+		if (effect & 1)
+			printf("ACS%-4d: %08x\n", i, effects->acs[i]);
+	}
+	for (i = 0; i < 256; i++) {
+		effect = le32_to_cpu(effects->acs[i]);
+		if (effect & 1)
+			printf("IOCS%-3d: %08x\n", i, effects->iocs[i]);
+	}
+}
+
 uint64_t int48_to_long(__u8 *data)
 {
 	int i;
@@ -1255,8 +1272,8 @@ static void show_auto_pst(struct nvme_auto_pst *apst)
 static void show_host_mem_buffer(struct nvme_host_mem_buffer *hmb)
 {
 	printf("\tHost Memory Descriptor List Entry Count (HMDLEC): %u\n", hmb->hmdlec);
-	printf("\tHost Memory Descriptor List Address     (HMDLAU): %u\n", hmb->hmdlau);
-	printf("\tHost Memory Descriptor List Address     (HMDLAL): %u\n", hmb->hmdlal);
+	printf("\tHost Memory Descriptor List Address     (HMDLAU): 0x%x\n", hmb->hmdlau);
+	printf("\tHost Memory Descriptor List Address     (HMDLAL): 0x%x\n", hmb->hmdlal);
 	printf("\tHost Memory Buffer Size                  (HSIZE): %u\n", hmb->hsize);
 }
 
@@ -1408,6 +1425,9 @@ void json_print_list_items(struct list_item *list_items, unsigned len)
 	char formatter[41] = { 0 };
 	int index, i = 0;
 	char *product;
+	long long int lba;
+	double nsze;
+	double nuse;
 
 	root = json_create_object();
 	devices = json_create_array();
@@ -1454,6 +1474,23 @@ void json_print_list_items(struct list_item *list_items, unsigned len)
 					     formatter);
 
 		json_array_add_value_object(devices, device_attrs);
+
+		lba = 1 << list_items[i].ns.lbaf[(list_items[i].ns.flbas & 0x0f)].ds;
+		nsze = le64_to_cpu(list_items[i].ns.nsze) * lba;
+		nuse = le64_to_cpu(list_items[i].ns.nuse) * lba;
+		json_object_add_value_int(device_attrs,
+					  "UsedBytes",
+					  nuse);
+		json_object_add_value_int(device_attrs,
+					  "MaximiumLBA",
+					  le64_to_cpu(list_items[i].ns.nsze));
+		json_object_add_value_int(device_attrs,
+					  "PhysicalSize",
+					  nsze);
+		json_object_add_value_int(device_attrs,
+					  "SectorSize",
+					  lba);
+
 		free((void*)product);
 	}
 	if (i)

@@ -223,6 +223,38 @@ static int get_smart_log(int argc, char **argv, struct command *cmd, struct plug
 	return err;
 }
 
+static int get_effects_log(int argc, char **argv, struct command *cmd, struct plugin *plugin)
+{
+	const char *desc = "Retrieve command effects log page and print the table.";
+	struct nvme_effects_log_page effects;
+
+	int err, fd;
+
+	struct config {
+	};
+
+	struct config cfg = {
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, &cfg, sizeof(cfg));
+	if (fd < 0)
+		return fd;
+
+	err = nvme_get_log(fd, 0xffffffff, 5, 4096, &effects);
+	if (!err)
+		show_effects_log(&effects);
+	else if (err > 0)
+		fprintf(stderr, "NVMe Status:%s(%x)\n",
+				nvme_status_to_string(err), err);
+	else
+		perror("effects log page");
+	return err;
+}
+
 static int get_error_log(int argc, char **argv, struct command *cmd, struct plugin *plugin)
 {
 	const char *desc = "Retrieve specified number of "\
@@ -363,6 +395,7 @@ static int get_log(int argc, char **argv, struct command *cmd, struct plugin *pl
 	const char *namespace_id = "desired namespace";
 	const char *log_id = "identifier of log to retrieve";
 	const char *log_len = "how many bytes to retrieve";
+	const char *aen = "result of the aen, use to override log id";
 	const char *raw_binary = "output in raw format";
 	int err, fd;
 
@@ -370,6 +403,7 @@ static int get_log(int argc, char **argv, struct command *cmd, struct plugin *pl
 		__u32 namespace_id;
 		__u32 log_id;
 		__u32 log_len;
+		__u32 aen;
 		int   raw_binary;
 	};
 
@@ -383,6 +417,7 @@ static int get_log(int argc, char **argv, struct command *cmd, struct plugin *pl
 		{"namespace-id", 'n', "NUM", CFG_POSITIVE, &cfg.namespace_id, required_argument, namespace_id},
 		{"log-id",       'i', "NUM", CFG_POSITIVE, &cfg.log_id,       required_argument, log_id},
 		{"log-len",      'l', "NUM", CFG_POSITIVE, &cfg.log_len,      required_argument, log_len},
+		{"aen",          'a', "NUM", CFG_POSITIVE, &cfg.aen,          required_argument, aen},
 		{"raw-binary",   'b', "",    CFG_NONE,     &cfg.raw_binary,   no_argument,       raw_binary},
 		{NULL}
 	};
@@ -390,6 +425,11 @@ static int get_log(int argc, char **argv, struct command *cmd, struct plugin *pl
 	fd = parse_and_open(argc, argv, desc, command_line_options, &cfg, sizeof(cfg));
 	if (fd < 0)
 		return fd;
+
+	if (cfg.aen) {
+		cfg.log_len = 4096;
+		cfg.log_id = (cfg.aen >> 16) & 0xff;
+	}
 
 	if (!cfg.log_len) {
 		fprintf(stderr, "non-zero log-len is required param\n");
@@ -448,7 +488,7 @@ static const char * sanitize_mon_status_to_string(__u16 status)
 
 static int sanitize_log(int argc, char **argv, struct command *command, struct plugin *plugin)
 {
-	char *desc = "Retrieve sanitize log and show it.";
+	const char *desc = "Retrieve sanitize log and show it.";
 	int fd;
 	int ret;
 	__u8 output[NVME_SANITIZE_LOG_DATA_LEN] = {0};
@@ -1678,7 +1718,7 @@ static int format(int argc, char **argv, struct command *cmd, struct plugin *plu
 
 	struct config cfg = {
 		.namespace_id = 0xffffffff,
-		.timeout      = 120000,
+		.timeout      = 600000,
 		.lbaf         = 0xff,
 		.ses          = 0,
 		.pi           = 0,
