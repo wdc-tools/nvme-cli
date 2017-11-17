@@ -55,6 +55,8 @@
 #define WDC_NVME_WDC_SN200_CNTRL_ID		0x0023
 #define WDC_NVME_SNDK_VID		        0x15b7
 #define WDC_NVME_SXSLCL_CNTRL_ID		0x0000
++#define WDC_NVME_ASPEN_VID             0x1b96
++#define WDC_NVME_ASPEN_CNTRL_ID        0x0000
 
 /* Capture Diagnostics */
 #define WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE	WDC_NVME_LOG_SIZE_DATA_LEN
@@ -433,6 +435,9 @@ static int wdc_check_device(int fd)
 	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
 			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTRL_ID))
 		ret = 0;
+	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_ASPEN_VID) &&
+			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_ASPEN_CNTRL_ID))
+		ret = 0;
 	else
 		fprintf(stderr, "WARNING : WDC : Device not supported\n");
 
@@ -457,12 +462,9 @@ static int wdc_check_device_sxslcl(int fd)
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
 			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTRL_ID))
 		ret = 0;
-	else
-		fprintf(stderr, "WARNING : WDC : Device not supported\n");
 
 	return ret;
 }
-
 
 static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix)
 {
@@ -735,6 +737,43 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 		return -1;
 	}
 	return wdc_do_cap_diag(fd, f);
+}
+
+static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
+               struct plugin *plugin)
+{
+       char *desc = "Internal Firmware Log.";
+       char *file = "Output file pathname.";
+       char f[PATH_MAX] = {0};
+       int fd;
+
+       struct config {
+               char *file;
+       };
+
+       struct config cfg = {
+               .file = NULL
+       };
+
+       const struct argconfig_commandline_options command_line_options[] = {
+               {"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
+               { NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+               {NULL}
+       };
+
+       fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+       if (fd < 0)
+               return fd;
+
+       wdc_check_device(fd);
+       if (cfg.file != NULL) {
+               strncpy(f, cfg.file, PATH_MAX);
+       }
+       if (wdc_get_serial_name(fd, f, PATH_MAX, "internal_fw_log") == -1) {
+               fprintf(stderr, "ERROR : WDC: failed to generate file name\n");
+               return -1;
+       }
+       return wdc_do_cap_diag(fd, f);
 }
 
 static int wdc_do_crash_dump(int fd, char *file)
@@ -2165,8 +2204,10 @@ static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 	if (fd < 0)
 		return fd;
 
-	if ( wdc_check_device_sxslcl(fd) < 0)
+	if ( wdc_check_device_sxslcl(fd) < 0) {
+		fprintf(stderr, "WARNING : WDC : Device not supported\n");
 		return -1;
+	}
 
 	if (cfg.dirName != NULL) {
 		strncpy(d, cfg.dirName, PATH_MAX);
