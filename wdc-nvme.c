@@ -55,8 +55,8 @@
 #define WDC_NVME_WDC_SN200_CNTRL_ID		0x0023
 #define WDC_NVME_SNDK_VID		        0x15b7
 #define WDC_NVME_SXSLCL_CNTRL_ID		0x0000
-+#define WDC_NVME_ASPEN_VID             0x1b96
-+#define WDC_NVME_ASPEN_CNTRL_ID        0x0000
+#define WDC_NVME_ASPEN_VID              0x1b96
+#define WDC_NVME_ASPEN_CNTRL_ID         0x0000
 
 /* Capture Diagnostics */
 #define WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE	WDC_NVME_LOG_SIZE_DATA_LEN
