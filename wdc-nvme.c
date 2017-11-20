@@ -1901,6 +1901,7 @@ int wdc_de_get_dump_trace(int fd, char * filePath, __u16 binFileNameLen, char *b
 static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 {
 	int ret = 0;
+    void *retPtr;
 	char                      fileName[MAX_PATH_LEN];
 	__s8                      bufferFolderPath[MAX_PATH_LEN];
 	char                      bufferFolderName[MAX_PATH_LEN];
@@ -1970,9 +1971,14 @@ static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 		wdc_UtilsSnprintf((char*)bufferFolderPath, MAX_PATH_LEN, "%s%s%s",
 				(char *)dir, WDC_DE_PATH_SEPARATOR, (char *)bufferFolderName);
 	} else {
-		getcwd((char*)currDir, MAX_PATH_LEN);
-		wdc_UtilsSnprintf((char*)bufferFolderPath, MAX_PATH_LEN, "%s%s%s",
+		retPtr = getcwd((char*)currDir, MAX_PATH_LEN);
+		if (retPtr != NULL)
+			wdc_UtilsSnprintf((char*)bufferFolderPath, MAX_PATH_LEN, "%s%s%s",
 				(char *)currDir, WDC_DE_PATH_SEPARATOR, (char *)bufferFolderName);
+		else {
+			fprintf(stderr, "ERROR : WDC : get current working directory failed\n");
+			return -1;
+		}
 	}
 
 	ret = wdc_UtilsCreateDir((char*)bufferFolderPath);
