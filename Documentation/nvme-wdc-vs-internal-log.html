@@ -1,9 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
     "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 8.6.8" />
+<meta name="generator" content="AsciiDoc 8.6.10" />
 <title>nvme-wdc-vs-internal-log(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
@@ -94,7 +95,9 @@ ul > li > * { color: black; }
   padding: 0;
   margin: 0;
 }
-
+pre {
+  white-space: pre-wrap;
+}
 
 #author {
   color: #527bbd;
@@ -223,7 +226,7 @@ div.exampleblock > div.content {
 }
 
 div.imageblock div.content { padding-left: 0; }
-span.image img { border-style: none; }
+span.image img { border-style: none; vertical-align: text-bottom; }
 a.image:visited { color: white; }
 
 dl {
@@ -746,7 +749,7 @@ nvme-wdc-vs-internal-log(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>nvme wdc vs-internal-log</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]</pre>
+<pre class="content"><em>nvme wdc vs-internal-log</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;] [--transfer-size=&lt;SIZE&gt;, -s &lt;SIZE&gt;]</pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -773,7 +776,18 @@ Results for any other device are undefined.</p></div>
 </dt>
 <dd>
 <p>
-        Output file; defaults to device serial number followed by "internal_fw_log" suffix
+        Output file; defaults to device serial number followed by "<em>internal_fw_log</em>&lt;date&gt;_&lt;time&gt;.bin" suffix
+</p>
+</dd>
+<dt class="hdlist1">
+-s &lt;SIZE&gt;
+</dt>
+<dt class="hdlist1">
+--transfer-size=&lt;SIZE&gt;
+</dt>
+<dd>
+<p>
+    Transfer size; defaults to the internal log size so full log will be transferred in one chunk
 </p>
 </dd>
 </dl></div>
@@ -785,7 +799,7 @@ Results for any other device are undefined.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-Gets the internal firmware log from the device and saves to default file in current directory (e.g. STM00019F3F9internal_fw_log.bin):
+Gets the internal firmware log from the device and saves to default file in current directory (e.g. STM00019F3F9_internal_fw_log_20171127_095704.bin):
 </p>
 <div class="listingblock">
 <div class="content">
@@ -794,20 +808,38 @@ Gets the internal firmware log from the device and saves to default file in curr
 </li>
 <li>
 <p>
-Gets the internal firmware log from the device and saves to defined file in current directory (e.g. testSTM00019F3F9internal_fw_log.bin):
+Gets the internal firmware log from the device and saves to defined file in current directory (e.g. test.bin):
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc vs-internal-log /dev/nvme0 -o test</code></pre>
+<pre><code># nvme wdc vs-internal-log /dev/nvme0 -o test.bin</code></pre>
 </div></div>
 </li>
 <li>
 <p>
-Gets the internal firmware log from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9internal_fw_log.bin):
+Gets the internal firmware log from the device and saves to defined file with pathname (e.g. /tmp/test):
 </p>
 <div class="listingblock">
 <div class="content">
 <pre><code># nvme wdc vs-internal-log /dev/nvme0 -o /tmp/test</code></pre>
+</div></div>
+</li>
+<li>
+<p>
+Gets the internal firmware log from the device transferring the data in 64k chunks and saves to default file in current directory (e.g. STM00019F3F9_internal_fw_log_20171127_100754.bin):
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><code># nvme wdc vs-internal-log /dev/nvme0 -s 0x10000</code></pre>
+</div></div>
+</li>
+<li>
+<p>
+Gets the internal firmware log from the device transferring the data in 16k chunks and saves to default file in current directory (e.g. STM00019F3F9_internal_fw_log_20171127_100950.bin):
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><code># nvme wdc vs-internal-log /dev/nvme0 -s 16384</code></pre>
 </div></div>
 </li>
 </ul></div>
@@ -823,7 +855,8 @@ Gets the internal firmware log from the device and saves to defined file with pa
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-11-13 14:53:05 CST
+Last updated
+ 2017-11-27 10:04:52 CST
 </div>
 </div>
 </body>

@@ -2,12 +2,12 @@
 .\"     Title: nvme-wdc-vs-internal-log
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 11/13/2017
+.\"      Date: 11/27/2017
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-VS\-INTER" "1" "11/13/2017" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-VS\-INTER" "1" "11/27/2017" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -32,7 +32,7 @@ nvme-wdc-vs-internal-log \- Retrieve WDC device\*(Aqs internal firmware log and 
 .SH "SYNOPSIS"
 .sp
 .nf
-\fInvme wdc vs\-internal\-log\fR <device> [\-\-output\-file=<FILE>, \-o <FILE>]
+\fInvme wdc vs\-internal\-log\fR <device> [\-\-output\-file=<FILE>, \-o <FILE>] [\-\-transfer\-size=<SIZE>, \-s <SIZE>]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -45,7 +45,12 @@ This will only work on WDC devices supporting this feature\&. Results for any ot
 .PP
 \-o <FILE>, \-\-output\-file=<FILE>
 .RS 4
-Output file; defaults to device serial number followed by "internal_fw_log" suffix
+Output file; defaults to device serial number followed by "\fIinternal_fw_log\fR<date>_<time>\&.bin" suffix
+.RE
+.PP
+\-s <SIZE>, \-\-transfer\-size=<SIZE>
+.RS 4
+Transfer size; defaults to the internal log size so full log will be transferred in one chunk
 .RE
 .SH "EXAMPLES"
 .sp
@@ -57,7 +62,7 @@ Output file; defaults to device serial number followed by "internal_fw_log" suff
 .sp -1
 .IP \(bu 2.3
 .\}
-Gets the internal firmware log from the device and saves to default file in current directory (e\&.g\&. STM00019F3F9internal_fw_log\&.bin):
+Gets the internal firmware log from the device and saves to default file in current directory (e\&.g\&. STM00019F3F9_internal_fw_log_20171127_095704\&.bin):
 .sp
 .if n \{\
 .RS 4
@@ -78,13 +83,13 @@ Gets the internal firmware log from the device and saves to default file in curr
 .sp -1
 .IP \(bu 2.3
 .\}
-Gets the internal firmware log from the device and saves to defined file in current directory (e\&.g\&. testSTM00019F3F9internal_fw_log\&.bin):
+Gets the internal firmware log from the device and saves to defined file in current directory (e\&.g\&. test\&.bin):
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-# nvme wdc vs\-internal\-log /dev/nvme0 \-o test
+# nvme wdc vs\-internal\-log /dev/nvme0 \-o test\&.bin
 .fi
 .if n \{\
 .RE
@@ -99,13 +104,55 @@ Gets the internal firmware log from the device and saves to defined file in curr
 .sp -1
 .IP \(bu 2.3
 .\}
-Gets the internal firmware log from the device and saves to defined file with pathname (e\&.g\&. /tmp/testSTM00019F3F9internal_fw_log\&.bin):
+Gets the internal firmware log from the device and saves to defined file with pathname (e\&.g\&. /tmp/test):
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
 # nvme wdc vs\-internal\-log /dev/nvme0 \-o /tmp/test
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Gets the internal firmware log from the device transferring the data in 64k chunks and saves to default file in current directory (e\&.g\&. STM00019F3F9_internal_fw_log_20171127_100754\&.bin):
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# nvme wdc vs\-internal\-log /dev/nvme0 \-s 0x10000
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Gets the internal firmware log from the device transferring the data in 16k chunks and saves to default file in current directory (e\&.g\&. STM00019F3F9_internal_fw_log_20171127_100950\&.bin):
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# nvme wdc vs\-internal\-log /dev/nvme0 \-s 16384
 .fi
 .if n \{\
 .RE
