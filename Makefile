@@ -53,8 +53,7 @@ test:
 all: doc
 
 clean:
-#	$(RM) $(NVME) *.o *~ a.out NVME-VERSION-FILE *.tar* nvme.spec version control nvme-*.deb
-	$(RM) $(NVME) *.o *~ a.out NVME-VERSION-FILE *.tar* nvme.spec control nvme-*.deb
+	$(RM) $(NVME) *.o *~ a.out NVME-VERSION-FILE *.tar* nvme.spec version control nvme-*.deb
 	$(MAKE) -C Documentation clean
 	$(RM) tests/*.pyc
 
