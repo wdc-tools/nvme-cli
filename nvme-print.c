@@ -58,6 +58,7 @@ void d_raw(unsigned char *buf, unsigned len)
 	unsigned i;
 	for (i = 0; i < len; i++)
 		putchar(*(buf+i));
+	printf("\n");
 }
 
 static void format(char *formatter, size_t fmt_sz, char *tofmt, size_t tofmtsz)
@@ -1788,10 +1789,12 @@ void json_fw_log(struct nvme_firmware_log_page *fw_log, const char *devname)
 	json_object_add_value_int(fwsi, "Active Firmware Slot (afi)", fw_log->afi);
 
 	for (i = 0; i < 7; i++) {
-		snprintf(fmt, sizeof(fmt), "Firmware Rev Slot %d", i);
-		snprintf(str, sizeof(str), "%"PRIu64" (%s)", (uint64_t)fw_log->frs[i],
-			 fw_to_string(fw_log->frs[i]));
-		json_object_add_value_string(fwsi, fmt, str);
+		if (fw_log->frs[i]) {
+			snprintf(fmt, sizeof(fmt), "Firmware Rev Slot %d", i+1);
+			snprintf(str, sizeof(str), "%"PRIu64" (%s)", (uint64_t)fw_log->frs[i],
+				fw_to_string(fw_log->frs[i]));
+			json_object_add_value_string(fwsi, fmt, str);
+		}
 	}
 	json_object_add_value_object(root, devname, fwsi);
 
