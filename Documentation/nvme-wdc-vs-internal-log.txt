@@ -29,7 +29,7 @@ OPTIONS
 
 -s <SIZE>::
 --transfer-size=<SIZE>::
-    Transfer size; defaults to the internal log size so full log will be transferred in one chunk
+    Transfer size; defaults to 0x10000 (65536 decimal) bytes
 
 EXAMPLES
 --------
