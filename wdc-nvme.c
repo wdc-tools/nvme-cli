@@ -752,7 +752,7 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 
 	struct config cfg = {
 		.file = NULL,
-		.xfer_size = 0
+		.xfer_size = 0x10000
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
@@ -795,15 +795,14 @@ static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
        UtilsTimeInfo             timeInfo;
        __u8                      timeStamp[MAX_PATH_LEN];
 
-
        struct config {
-               char *file;
-               __u32 xfer_size;
+    	   char *file;
+    	   __u32 xfer_size;
        };
 
        struct config cfg = {
-               .file = NULL,
-               .xfer_size = 0
+		   .file = NULL,
+		   .xfer_size = 0x10000
        };
 
        const struct argconfig_commandline_options command_line_options[] = {
