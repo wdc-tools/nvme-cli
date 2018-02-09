@@ -56,6 +56,8 @@ COMMAND_LIST(
 	ENTRY("gen-hostnqn", "Generate NVMeoF host NQN", gen_hostnqn_cmd)
 	ENTRY("dir-receive", "Submit a Directive Receive command, return results", dir_receive)
 	ENTRY("dir-send", "Submit a Directive Send command, return results", dir_send)
+	ENTRY("set-timestamp", "Submit a Timestamp set feature command", set_timestamp)
+	ENTRY("get-timestamp", "Submit a Timestamp get feature command", get_timestamp)
 );
 
 #endif
