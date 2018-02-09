@@ -1,0 +1,50 @@
+nvme-get-timestamp(1)
+=====================
+
+NAME
+----
+nvme-get-timestamp - Gets the timestamp feature ID data from the nvme controller.
+
+SYNOPSIS
+--------
+[verse]
+'nvme get-timestamp' <device>
+
+DESCRIPTION
+-----------
+Gets the timestamp feature id data from the NVMe controller.  The <device> parameter
+is mandatory and must be an NVMe character device (ex: /dev/nvme0).
+
+Returns the current timestamp value along the Timestamp Origin and Synch bits.  
+
+If the origin field is set to 000b, then the returned timestamp value is set to the 
+time in milliseconds since the last controller level reset.  If the origin field is 
+set to 0001b, then the returned timestamp value is set to the last timestamp value
+set by the host plus the time milliseconds since the timestamp was set.
+
+The Origin/Synch field is a byte in length with bits defined as follows:
+
+*  Bits 07:04  Reserved 
+*  Bits 03:01  Timestamp Origin
+**               000b - The timestamp field was initialized to '0' by a Controller Level Reset
+**               001b - The timestamp field was initialized with a value using the set features command.
+**               010b-111b - Reserved
+*  Bit  00     Synch
+**               0b - The controller counted time in milliseconds continuously since the timestamp value was initialized.
+**               1b - The controller may have stopped counting during vendor specific intervals after the timestamp value was initialized.
+                                           
+OPTIONS
+-------
+None
+
+EXAMPLES
+--------
+* Gets the timestamp feature id data from the NVMe controller.
++
+------------
+# nvme get-timestamp /dev/nvme0
+------------
+
+NVME
+----
+Part of the nvme-user suite

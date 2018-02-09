@@ -1,0 +1,46 @@
+nvme-set-timestamp(1)
+=====================
+
+NAME
+----
+nvme-set-timestamp - Sets a timestamp value in the nvme controller.
+
+SYNOPSIS
+--------
+[verse]
+'nvme set-timestamp' <device> [--timestamp=<timestamp> | -t <timestamp>]
+
+DESCRIPTION
+-----------
+Sets a timestamp value in NVMe controller.  The timestamp value used must be specified 
+in number of milliseconds.  The <device> parameter is mandatory and must be an NVMe 
+character device (ex: /dev/nvme0).
+
+OPTIONS
+-------
+-t <timestamp>::
+--timestamp=<timestamp>::
+    Timestamp: This field specifies the timestamp (in milliseconds) value to set.  If one
+    is not specified, it will default to the number of milliseconds that have elapsed 
+    since midnight, January 01, 1970.
+
+
+
+EXAMPLES
+--------
+* Sets the default timestamp value (milliseconds elapsed since midnight, January 01, 1970) 
+  in the NVMe controller.
++
+------------
+# nvme set-timestamp /dev/nvme0
+------------
+
+* Sets the timestamp value to 0 in the NVMe controller.
++
+------------
+# nvme set-timestamp /dev/nvme0 -t 0
+------------
+
+NVME
+----
+Part of the nvme-user suite

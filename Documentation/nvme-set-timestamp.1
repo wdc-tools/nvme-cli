@@ -1,0 +1,91 @@
+'\" t
+.\"     Title: nvme-set-timestamp
+.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 02/07/2018
+.\"    Manual: NVMe Manual
+.\"    Source: NVMe
+.\"  Language: English
+.\"
+.TH "NVME\-SET\-TIMESTAMP" "1" "02/07/2018" "NVMe" "NVMe Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+nvme-set-timestamp \- Sets a timestamp value in the nvme controller\&.
+.SH "SYNOPSIS"
+.sp
+.nf
+\fInvme set\-timestamp\fR <device> [\-\-timestamp=<timestamp> | \-t <timestamp>]
+.fi
+.SH "DESCRIPTION"
+.sp
+Sets a timestamp value in NVMe controller\&. The timestamp value used must be specified in number of milliseconds\&. The <device> parameter is mandatory and must be an NVMe character device (ex: /dev/nvme0)\&.
+.SH "OPTIONS"
+.PP
+\-t <timestamp>, \-\-timestamp=<timestamp>
+.RS 4
+Timestamp: This field specifies the timestamp (in milliseconds) value to set\&. If one is not specified, it will default to the number of milliseconds that have elapsed since midnight, January 01, 1970\&.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Sets the default timestamp value (milliseconds elapsed since midnight, January 01, 1970) in the NVMe controller\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# nvme set\-timestamp /dev/nvme0
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Sets the timestamp value to 0 in the NVMe controller\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# nvme set\-timestamp /dev/nvme0 \-t 0
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.SH "NVME"
+.sp
+Part of the nvme\-user suite

@@ -1,0 +1,163 @@
+'\" t
+.\"     Title: nvme-get-timestamp
+.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 02/07/2018
+.\"    Manual: NVMe Manual
+.\"    Source: NVMe
+.\"  Language: English
+.\"
+.TH "NVME\-GET\-TIMESTAMP" "1" "02/07/2018" "NVMe" "NVMe Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+nvme-get-timestamp \- Gets the timestamp feature ID data from the nvme controller\&.
+.SH "SYNOPSIS"
+.sp
+.nf
+\fInvme get\-timestamp\fR <device>
+.fi
+.SH "DESCRIPTION"
+.sp
+Gets the timestamp feature id data from the NVMe controller\&. The <device> parameter is mandatory and must be an NVMe character device (ex: /dev/nvme0)\&.
+.sp
+Returns the current timestamp value along the Timestamp Origin and Synch bits\&.
+.sp
+If the origin field is set to 000b, then the returned timestamp value is set to the time in milliseconds since the last controller level reset\&. If the origin field is set to 0001b, then the returned timestamp value is set to the last timestamp value set by the host plus the time milliseconds since the timestamp was set\&.
+.sp
+The Origin/Synch field is a byte in length with bits defined as follows:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Bits 07:04 Reserved
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Bits 03:01 Timestamp Origin
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+000b \- The timestamp field was initialized to
+\fI0\fR
+by a Controller Level Reset
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+001b \- The timestamp field was initialized with a value using the set features command\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+010b\-111b \- Reserved
+.RE
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Bit 00 Synch
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+0b \- The controller counted time in milliseconds continuously since the timestamp value was initialized\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+1b \- The controller may have stopped counting during vendor specific intervals after the timestamp value was initialized\&.
+.RE
+.RE
+.SH "OPTIONS"
+.sp
+None
+.SH "EXAMPLES"
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Gets the timestamp feature id data from the NVMe controller\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# nvme get\-timestamp /dev/nvme0
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.SH "NVME"
+.sp
+Part of the nvme\-user suite
