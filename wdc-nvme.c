@@ -763,10 +763,8 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if (fd < 0) {
-        fprintf(stderr, "ERROR : WDC: failed to parse and open args\n");
+	if (fd < 0)
 		return fd;
-	}
 
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
@@ -813,10 +811,8 @@ static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
        };
 
        fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-       if (fd < 0) {
-           fprintf(stderr, "ERROR : WDC: failed to parse and open args\n");
-           return fd;
-       }
+       if (fd < 0)
+    	   return fd;
 
        wdc_check_device(fd);
        if (cfg.xfer_size != 0) {
@@ -928,10 +924,8 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if (fd < 0) {
-        fprintf(stderr, "ERROR : WDC: failed to parse and open args\n");
-		return fd;
-	}
+    if (fd < 0)
+ 	   return fd;
 
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
@@ -966,10 +960,8 @@ static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if (fd < 0) {
-        fprintf(stderr, "ERROR : WDC: failed to parse and open args\n");
+	if (fd < 0)
 		return fd;
-	}
 
 	wdc_check_device(fd);
 	ret = wdc_crash_dump(fd, cfg.file);
