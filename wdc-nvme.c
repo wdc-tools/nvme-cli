@@ -48,6 +48,7 @@
 #define WDC_NVME_SUBCMD_SHIFT	8
 
 #define WDC_NVME_LOG_SIZE_DATA_LEN			0x08
+#define WDC_NVME_LOG_SIZE_HDR_LEN			0x08
 
 /* Device Config */
 #define WDC_NVME_WDC_VID		        0x1c58
@@ -152,6 +153,8 @@
 #define WDC_DE_EVENT_LOG_FILE_NAME					"event_log"
 #define WDC_DE_DESTN_SPI							1
 #define WDC_DE_DUMPTRACE_DESTINATION				6
+
+#define min(x, y) ((x) > (y) ? (y) : (x))
 
 typedef enum _NVME_FEATURES_SELECT
 {
@@ -313,6 +316,12 @@ static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 /* Drive log data size */
 struct wdc_log_size {
 	__le32	log_size;
+};
+
+/* E6 log header */
+struct wdc_e6_log_hdr {
+	__le32  eye_catcher;
+	__u8	log_size[4];
 };
 
 /* Purge monitor response */
@@ -646,6 +655,30 @@ static __u32 wdc_dump_length(int fd, __u32 opcode, __u32 cdw10, __u32 cdw12, __u
 		*dump_length = buf[0x04] << 24 | buf[0x05] << 16 | buf[0x06] << 8 | buf[0x07];
 	else
 		*dump_length = le32_to_cpu(l->log_size);
+
+	return ret;
+}
+
+static __u32 wdc_dump_length_e6(int fd, __u32 opcode, __u32 cdw10, __u32 cdw12, struct wdc_e6_log_hdr *dump_hdr)
+{
+	int ret;
+	struct nvme_admin_cmd admin_cmd;
+
+	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
+	admin_cmd.opcode = opcode;
+	admin_cmd.addr = (__u64)(uintptr_t)dump_hdr;
+	admin_cmd.data_len = WDC_NVME_LOG_SIZE_HDR_LEN;
+	admin_cmd.cdw10 = cdw10;
+	admin_cmd.cdw12 = cdw12;
+
+	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+	if (ret != 0) {
+		ret = -1;
+		fprintf(stderr, "ERROR : WDC : reading dump length failed\n");
+		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+		return ret;
+	}
+
 	return ret;
 }
 
@@ -706,32 +739,104 @@ static int wdc_do_dump(int fd, __u32 opcode,__u32 data_len, __u32 cdw10,
 	return ret;
 }
 
+static int wdc_do_dump_e6(int fd, __u32 opcode,__u32 data_len,
+		__u32 cdw12, char *file, __u32 xfer_size, __u8 *log_hdr)
+{
+	int ret = 0;
+	__u8 *dump_data;
+	__u32 curr_data_offset, log_size;
+	int i;
+	struct nvme_admin_cmd admin_cmd;
+
+	dump_data = (__u8 *) malloc(sizeof (__u8) * data_len);
+
+	if (dump_data == NULL) {
+		fprintf(stderr, "%s: ERROR : malloc : %s\n", __func__, strerror(errno));
+		return -1;
+	}
+	memset(dump_data, 0, sizeof (__u8) * data_len);
+	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
+	curr_data_offset = WDC_NVME_LOG_SIZE_HDR_LEN;
+	i = 0;
+
+	/* copy the 8 byte header into the dump_data buffer */
+	memcpy(dump_data, log_hdr, WDC_NVME_LOG_SIZE_HDR_LEN);
+
+	admin_cmd.opcode = opcode;
+	admin_cmd.cdw12 = cdw12;
+
+	log_size = data_len;
+	while (log_size > 0) {
+		xfer_size = min(xfer_size, log_size);
+
+		admin_cmd.addr = (__u64)(uintptr_t)dump_data + (__u64)curr_data_offset;
+		admin_cmd.data_len = xfer_size;
+		admin_cmd.cdw10 = xfer_size >> 2;
+		admin_cmd.cdw13 = curr_data_offset >> 2;
+
+		ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+		if (ret != 0) {
+			fprintf(stderr, "%s: ERROR : WDC : NVMe Status:%s(%x)\n", __func__, nvme_status_to_string(ret), ret);
+			fprintf(stderr, "%s: ERROR : WDC : Get chunk %d, size = 0x%x, offset = 0x%x, addr = %p\n",
+					__func__, i, admin_cmd.data_len, curr_data_offset, (void *)admin_cmd.addr);
+			break;
+		}
+
+		log_size         -= xfer_size;
+		curr_data_offset += xfer_size;
+		i++;
+	}
+
+	if (ret == 0) {
+		fprintf(stderr, "%s:  NVMe Status:%s(%x)\n", __func__, nvme_status_to_string(ret), ret);
+		ret = wdc_create_log_file(file, dump_data, data_len);
+	}
+	free(dump_data);
+	return ret;
+}
+
+
 static int wdc_do_cap_diag(int fd, char *file, __u32 xfer_size)
 {
 	int ret;
+	__u32 e6_log_hdr_size = 0x40;
+	struct wdc_e6_log_hdr *log_hdr;
 	__u32 cap_diag_length;
 
-	ret = wdc_dump_length(fd, WDC_NVME_CAP_DIAG_OPCODE,
-						WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE,
-						0x00,
-						&cap_diag_length);
-	if (ret == -1) {
+	log_hdr = (struct wdc_e6_log_hdr *) malloc(e6_log_hdr_size);
+	if (log_hdr == NULL) {
+		fprintf(stderr, "%s: ERROR : malloc : %s\n", __func__, strerror(errno));
 		return -1;
 	}
+	memset(log_hdr, 0, e6_log_hdr_size);
+
+	ret = wdc_dump_length_e6(fd, WDC_NVME_CAP_DIAG_OPCODE,
+						WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE,
+						0x00,
+						log_hdr);
+	if (ret == -1) {
+		free(log_hdr);
+		return -1;
+	}
+
+	cap_diag_length = (log_hdr->log_size[0] << 24 | log_hdr->log_size[1] << 16 |
+			log_hdr->log_size[2] << 8 | log_hdr->log_size[3]);
+
 	if (cap_diag_length == 0) {
 		fprintf(stderr, "INFO : WDC : Capture Diagnostics log is empty\n");
 	} else {
 		if (xfer_size == 0)
 			xfer_size = cap_diag_length;
 
-		ret = wdc_do_dump(fd, WDC_NVME_CAP_DIAG_OPCODE, cap_diag_length,
-				cap_diag_length,
-				(WDC_NVME_CAP_DIAG_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
-				 WDC_NVME_CAP_DIAG_CMD, cap_diag_length, file, xfer_size);
+		ret = wdc_do_dump_e6(fd, WDC_NVME_CAP_DIAG_OPCODE, cap_diag_length,
+				(WDC_NVME_CAP_DIAG_SUBCMD << WDC_NVME_SUBCMD_SHIFT) | WDC_NVME_CAP_DIAG_CMD,
+				file, xfer_size, (__u8 *)log_hdr);
 
 		fprintf(stderr, "INFO : WDC : Capture Diagnostics log, length = 0x%x, ret = %d\n",
 				cap_diag_length, ret);
 	}
+
+	free(log_hdr);
 	return ret;
 }
 
