@@ -799,7 +799,7 @@ static int wdc_do_dump_e6(int fd, __u32 opcode,__u32 data_len,
 static int wdc_do_cap_diag(int fd, char *file, __u32 xfer_size)
 {
 	int ret;
-	__u32 e6_log_hdr_size = 0x40;
+	__u32 e6_log_hdr_size = WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE;
 	struct wdc_e6_log_hdr *log_hdr;
 	__u32 cap_diag_length;
 
@@ -811,7 +811,7 @@ static int wdc_do_cap_diag(int fd, char *file, __u32 xfer_size)
 	memset(log_hdr, 0, e6_log_hdr_size);
 
 	ret = wdc_dump_length_e6(fd, WDC_NVME_CAP_DIAG_OPCODE,
-						WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE,
+						WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE>>2,
 						0x00,
 						log_hdr);
 	if (ret == -1) {
