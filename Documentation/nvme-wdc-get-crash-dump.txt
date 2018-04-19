@@ -31,17 +31,17 @@ OPTIONS
 
 EXAMPLES
 --------
-* Gets the crash dump from the device and saves to default file in current directory (e.g. STM00019F3F9crash_dump.bin):
+* Gets the crash dump from the device and saves to default file in current directory (e.g. STM00019F3F9_crash_dump.bin):
 +
 ------------
 # nvme wdc get-crash-dump /dev/nvme0
 ------------
-* Gets the crash dump from the device and saves to defined file in current directory (e.g. testSTM00019F3F9crash_dump.bin):
+* Gets the crash dump from the device and saves to defined file in current directory (e.g. testSTM00019F3F9_crash_dump.bin):
 +
 ------------
 # nvme wdc get-crash-dump /dev/nvme0 -o test
 ------------
-* Gets the crash dump from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9crash_dump.bin):
+* Gets the crash dump from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9_crash_dump.bin):
 +
 ------------
 # nvme wdc get-crash-dump /dev/nvme0 -o /tmp/test

@@ -5,7 +5,7 @@
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
 <meta name="generator" content="AsciiDoc 8.6.10" />
-<title>nvme-wdc-get-crash-dump(1)</title>
+<title>nvme-wdc-get-pfail-dump(1)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -735,12 +735,12 @@ asciidoc.install();
 <body class="manpage">
 <div id="header">
 <h1>
-nvme-wdc-get-crash-dump(1) Manual Page
+nvme-wdc-get-pfail-dump(1) Manual Page
 </h1>
 <h2>NAME</h2>
 <div class="sectionbody">
-<p>nvme-wdc-get-crash-dump -
-   Retrieve WDC device's crash dump.
+<p>nvme-wdc-get-pfail-dump -
+   Retrieve WDC device's pfail crash dump.
 </p>
 </div>
 </div>
@@ -749,7 +749,7 @@ nvme-wdc-get-crash-dump(1) Manual Page
 <h2 id="_synopsis">SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>nvme wdc get-crash-dump</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]</pre>
+<pre class="content"><em>nvme wdc get-pfail-dump</em> &lt;device&gt; [--output-file=&lt;FILE&gt;, -o &lt;FILE&gt;]</pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -757,10 +757,10 @@ nvme-wdc-get-crash-dump(1) Manual Page
 <div class="sect1">
 <h2 id="_description">DESCRIPTION</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>For the NVMe device given, sends the WDC vendor unique crash dump
-request and saves the result to file. In current implementation crash dump is
-captured if it is present. On success it will save the dump in file with
-appropriate suffix. Note that this command will clear the available
+<div class="paragraph"><p>For the NVMe device given, sends the WDC vendor unique pfail crash dump
+request and saves the result to file. In current implementation pfail crash
+dump is captured if it is present. On success it will save the dump in file
+with appropriate suffix. Note that this command will clear the available
 dump from the device on success.</p></div>
 <div class="paragraph"><p>The &lt;device&gt; parameter is mandatory NVMe character device (ex: /dev/nvme0).</p></div>
 <div class="paragraph"><p>This will only work on WDC devices supporting this feature.
@@ -779,7 +779,7 @@ Results for any other device are undefined.</p></div>
 </dt>
 <dd>
 <p>
-        Output file; defaults to device serial number followed by "crash_dump" suffix
+        Output file; defaults to device serial number followed by "pfail_dump" suffix
 </p>
 </dd>
 </dl></div>
@@ -791,29 +791,31 @@ Results for any other device are undefined.</p></div>
 <div class="ulist"><ul>
 <li>
 <p>
-Gets the crash dump from the device and saves to default file in current directory (e.g. STM00019F3F9_crash_dump.bin):
+Gets the pfail crash dump from the device and saves to default file in current directory
+(e.g. STM00019F3F9_pfail_dump.bin):
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc get-crash-dump /dev/nvme0</code></pre>
+<pre><code># nvme wdc get-pfail-dump /dev/nvme0</code></pre>
 </div></div>
 </li>
 <li>
 <p>
-Gets the crash dump from the device and saves to defined file in current directory (e.g. testSTM00019F3F9_crash_dump.bin):
+Gets the pfail crash dump from the device and saves to defined file in current directory
+(e.g. testSTM00019F3F9_pfail_dump.bin):
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc get-crash-dump /dev/nvme0 -o test</code></pre>
+<pre><code># nvme wdc get-pfail-dump /dev/nvme0 -o test</code></pre>
 </div></div>
 </li>
 <li>
 <p>
-Gets the crash dump from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9_crash_dump.bin):
+Gets the pfail crash dump from the device and saves to defined file with pathname (e.g. /tmp/testSTM00019F3F9_pfail_dump.bin):
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><code># nvme wdc get-crash-dump /dev/nvme0 -o /tmp/test</code></pre>
+<pre><code># nvme wdc get-pfail-dump /dev/nvme0 -o /tmp/test</code></pre>
 </div></div>
 </li>
 </ul></div>
