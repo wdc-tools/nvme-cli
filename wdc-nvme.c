@@ -816,6 +816,15 @@ static int wdc_do_cap_diag(int fd, char *file, __u32 xfer_size)
 	__u32 e6_log_hdr_size = WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE;
 	struct wdc_e6_log_hdr *log_hdr;
 	__u32 cap_diag_length;
+	int verify_file;
+
+	/* verify the passed in file name and path is valid before getting the dump data */
+	verify_file = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	if (verify_file < 0) {
+		fprintf(stderr, "ERROR : WDC: open : %s\n", strerror(errno));
+		return -1;
+	}
+	close(verify_file);
 
 	log_hdr = (struct wdc_e6_log_hdr *) malloc(e6_log_hdr_size);
 	if (log_hdr == NULL) {
