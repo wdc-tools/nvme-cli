@@ -6,6 +6,14 @@
 #include "linux/nvme_ioctl.h"
 #include "nvme.h"
 
+/* rate of ioctl retries */
+#define IOCTL_TIMESPERSEC	4
+/* delay between retries. Units in us */
+#define IOCTL_DELAY		(1000000 / IOCTL_TIMESPERSEC)	/* 250ms */
+
+#define NO_RETRIES		0
+#define DISCOVERY_RETRIES	(IOCTL_TIMESPERSEC * 60)	/* 60s */
+
 int nvme_get_nsid(int fd);
 
 /* Generic passthrough */
@@ -78,17 +86,26 @@ int nvme_identify_ns(int fd, __u32 nsid, bool present, void *data);
 int nvme_identify_ns_list(int fd, __u32 nsid, bool all, void *data);
 int nvme_identify_ctrl_list(int fd, __u32 nsid, __u16 cntid, void *data);
 int nvme_identify_ns_descs(int fd, __u32 nsid, void *data);
-
+int nvme_get_log13(int fd, __u32 nsid, __u8 log_id, __u8 lsp, __u64 lpo,
+		   __u16 group_id, __u32 data_len, void *data);
 int nvme_get_log(int fd, __u32 nsid, __u8 log_id, __u32 data_len, void *data);
+
+
+int nvme_get_telemetry_log(int fd, void *lp, int generate_report,
+			   int ctrl_gen, size_t log_page_size, __u64 offset);
 int nvme_fw_log(int fd, struct nvme_firmware_log_page *fw_log);
-int nvme_error_log(int fd, __u32 nsid, int entries,
-		   struct nvme_error_log_page *err_log);
+int nvme_error_log(int fd, int entries, struct nvme_error_log_page *err_log);
 int nvme_smart_log(int fd, __u32 nsid, struct nvme_smart_log *smart_log);
+int nvme_effects_log(int fd, struct nvme_effects_log_page *effects_log);
 int nvme_discovery_log(int fd, struct nvmf_disc_rsp_page_hdr *log, __u32 size);
+int nvme_sanitize_log(int fd, struct nvme_sanitize_log_page *sanitize_log);
+int nvme_endurance_log(int fd, __u16 group_id,
+		       struct nvme_endurance_group_log *endurance_log);
 
 int nvme_feature(int fd, __u8 opcode, __u32 nsid, __u32 cdw10,
-		 __u32 cdw11, __u32 data_len, void *data, __u32 *result);
-int nvme_set_feature(int fd, __u32 nsid, __u8 fid, __u32 value,
+		 __u32 cdw11, __u32 cdw12, __u32 data_len, void *data,
+		 __u32 *result);
+int nvme_set_feature(int fd, __u32 nsid, __u8 fid, __u32 value, __u32 cdw12,
 		     bool save, __u32 data_len, void *data, __u32 *result);
 int nvme_get_feature(int fd, __u32 nsid, __u8 fid, __u8 sel,
 		     __u32 cdw11, __u32 data_len, void *data, __u32 *result);
@@ -106,7 +123,7 @@ int nvme_ns_attach_ctrls(int fd, __u32 nsid, __u16 num_ctrls, __u16 *ctrlist);
 int nvme_ns_detach_ctrls(int fd, __u32 nsid, __u16 num_ctrls, __u16 *ctrlist);
 
 int nvme_fw_download(int fd, __u32 offset, __u32 data_len, void *data);
-int nvme_fw_activate(int fd, __u8 slot, __u8 action);
+int nvme_fw_commit(int fd, __u8 slot, __u8 action, __u8 bpid);
 
 int nvme_sec_send(int fd, __u32 nsid, __u8 nssf, __u16 spsp,
 		  __u8 secp, __u32 tl, __u32 data_len, void *data, __u32 *result);
@@ -121,5 +138,9 @@ int nvme_dir_send(int fd, __u32 nsid, __u16 dspec, __u8 dtype, __u8 doper,
 		  __u32 data_len, __u32 dw12, void *data, __u32 *result);
 int nvme_dir_recv(int fd, __u32 nsid, __u16 dspec, __u8 dtype, __u8 doper,
 		  __u32 data_len, __u32 dw12, void *data, __u32 *result);
+int nvme_get_properties(int fd, void **pbar);
+int nvme_set_property(int fd, int offset, int value);
+int nvme_sanitize(int fd, __u8 sanact, __u8 ause, __u8 owpass, __u8 oipbp,
+		  __u8 no_dealloc, __u32 ovrpat);
 
 #endif				/* _NVME_LIB_H */

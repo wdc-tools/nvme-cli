@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Western Digital Corporation or its affiliates.
+ * Copyright (c) 2017-2018 Western Digital Corporation or its affiliates.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA  02110-1301, USA.
  *
- *   Author: Jeff Lien <jeff.lieni@wdc.com>,
+ *   Author: Jeff Lien <jeff.lien@wdc.com>,
  */
 
 #include <errno.h>
