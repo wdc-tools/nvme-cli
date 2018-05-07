@@ -171,6 +171,32 @@ static const char *cms_str(__u8 cm)
 
 static int do_discover(char *argstr, bool connect);
 
+#define OPEN_RETRIES	4
+#define OPEN_DELAY	500000		/* us units, thus 1/2 second */
+
+static void
+wait_for_devname(int instance)
+{
+	char *dev_name;
+	int retry = 0, fd;
+
+	if (asprintf(&dev_name, "/dev/nvme%d", instance) < 0)
+		return;
+
+	/* takes a little time for udev to make the dev node */
+	for ( ; retry < OPEN_RETRIES; retry++) {
+		fd = open(dev_name, O_RDWR);
+		if (fd >= 0) {
+			close(fd);
+			break;
+		}
+		if (errno != EAGAIN)
+			break;
+		usleep(OPEN_DELAY);
+	}
+	free(dev_name);
+}
+
 static int add_ctrl(const char *argstr)
 {
 	substring_t args[MAX_OPT_ARGS];
@@ -225,6 +251,8 @@ out_fail:
 out_close:
 	close(fd);
 out:
+	if (ret >= 0)
+		wait_for_devname(ret);
 	return ret;
 }
 
@@ -614,6 +642,14 @@ static int connect_ctrl(struct nvmf_disc_rsp_page_entry *e)
 		p += len;
 	}
 
+	if (cfg.host_traddr) {
+		len = sprintf(p, ",host_traddr=%s", cfg.host_traddr);
+		if (len < 0)
+			return -EINVAL;
+		p+= len;
+	}
+
+
 	switch (e->trtype) {
 	case NVMF_TRTYPE_LOOP: /* loop */
 		len = sprintf(p, ",transport=loop");
@@ -658,11 +694,6 @@ static int connect_ctrl(struct nvmf_disc_rsp_page_entry *e)
 			if (len < 0)
 				return -EINVAL;
 			p += len;
-
-			len = sprintf(p, ",host_traddr=%s", cfg.host_traddr);
-			if (len < 0)
-				return -EINVAL;
-			p+= len;
 
 			len = sprintf(p, ",traddr=%.*s",
 				      space_strip_len(NVMF_TRADDR_SIZE, e->traddr),
@@ -733,10 +764,10 @@ static int do_discover(char *argstr, bool connect)
 		break;
 	case DISC_NOT_EQUAL:
 		fprintf(stderr,
-		"Numrec values of last two get dicovery log page not equal\n");
+		"Numrec values of last two get discovery log page not equal\n");
 		break;
 	default:
-		fprintf(stderr, "Get dicovery log page failed: %d\n", ret);
+		fprintf(stderr, "Get discovery log page failed: %d\n", ret);
 		break;
 	}
 
@@ -818,6 +849,7 @@ int discover(const char *desc, int argc, char **argv, bool connect)
 		{"queue-size",  'Q', "LIST", CFG_STRING, &cfg.queue_size,  required_argument, "number of io queue elements to use (default 128)" },
 		{"nr-io-queues",'i', "LIST", CFG_STRING, &cfg.nr_io_queues,required_argument, "number of io queues to use (default is core count)" },
 		{"raw",         'r', "LIST", CFG_STRING, &cfg.raw,         required_argument, "raw output file" },
+		{"keep-alive-tmo",  'k', "LIST", CFG_STRING, &cfg.keep_alive_tmo,  required_argument, "keep alive timeout period in seconds" },
 		{NULL},
 	};
 

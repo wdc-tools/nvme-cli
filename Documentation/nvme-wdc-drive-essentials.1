@@ -1,13 +1,22 @@
 '\" t
 .\"     Title: nvme-wdc-drive-essentials
-.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 10/03/2017
+.\"    Author: [FIXME: author] [see http://www.docbook.org/tdg5/en/html/author]
+.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
+.\"      Date: 03/01/2018
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-DRIVE\-ES" "1" "10/03/2017" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-DRIVE\-ES" "1" "03/01/2018" "NVMe" "NVMe Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -19,7 +28,7 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-nvme-wdc-drive-essentials \- Retrieve WDC device\'s drive essentials bin files and save to a tar file\&.
+nvme-wdc-drive-essentials \- Retrieve WDC device\*(Aqs drive essentials bin files and save to a tar file\&.
 .SH "SYNOPSIS"
 .sp
 .nf
@@ -27,7 +36,7 @@ nvme-wdc-drive-essentials \- Retrieve WDC device\'s drive essentials bin files a
 .fi
 .SH "DESCRIPTION"
 .sp
-For the NVMe device given, captures the drive essential bin files and saves them into a tar file\&. The tar file will be in the following format: DRIVE_ESSENTIALS_<Serial Num>\fI<FW Revision>\fR<Date>_<Time>\&.tar\&.gz e\&.g\&. DRIVE_ESSENTIALS_A00FD8CA_1048_20170713_091731\&.tar\&.gz
+For the NVMe device given, captures the drive essential bin files and saves them into a tar file\&. The tar file will be in the following format: DRIVE_ESSENTIALS_<Serial Num>_<FW Revision>_<Date>_<Time>\&.tar\&.gz e\&.g\&. DRIVE_ESSENTIALS_A00FD8CA_1048_20170713_091731\&.tar\&.gz
 .sp
 The <device> parameter is mandatory; NVMe character device (ex: /dev/nvme0)\&.
 .sp

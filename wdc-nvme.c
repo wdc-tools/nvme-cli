@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017 Western Digital Corporation or its affiliates.
+ * Copyright (c) 2015-2018 Western Digital Corporation or its affiliates.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,7 +17,8 @@
  * MA  02110-1301, USA.
  *
  *   Author: Chaitanya Kulkarni <chaitanya.kulkarni@hgst.com>,
- *           Dong Ho <dong.ho@hgst.com>
+ *           Dong Ho <dong.ho@hgst.com>,
+ *           Jeff Lien <jeff.lien@wdc.com>
  */
 #include <stdio.h>
 #include <string.h>
@@ -297,10 +298,6 @@ NVME_VU_DE_LOGPAGE_LIST deVULogPagesList[] =
     { NVME_DE_LOGPAGE_C0, 0xC0, 512, "0xc0"}
 };
 
-/* VU Drive Lock/Unlock Feature */
-#define WDC_DE_VU_UNLOCK_FEATURE_IDENTIFIER     0xC0
-#define WDC_DE_VU_LOCK_PASSPHRASE              "gevt" /*used to Lock the drive by sending a bad key */
-
 static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix);
 static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 		__u32 drive_log_length);
@@ -459,6 +456,9 @@ static int wdc_check_device(int fd)
 		ret = 0;
 	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_ASPEN_VID) &&
 			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_ASPEN_CNTRL_ID))
+		ret = 0;
+	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
+			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTRL_ID))
 		ret = 0;
 	else
 		fprintf(stderr, "WARNING : WDC : Device not supported\n");
@@ -1081,8 +1081,8 @@ static int wdc_do_drive_log(int fd, char *file)
 static int wdc_drive_log(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
-	char *desc = "Capture Drive Log.";
-	char *file = "Output file pathname.";
+	const char *desc = "Capture Drive Log.";
+	const char *file = "Output file pathname.";
 	char f[PATH_MAX] = {0};
 	int fd;
 	struct config {
@@ -1117,8 +1117,8 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 static int wdc_get_crash_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
-	char *desc = "Get Crash Dump.";
-	char *file = "Output file pathname.";
+	const char *desc = "Get Crash Dump.";
+	const char *file = "Output file pathname.";
 	int fd;
 	int ret;
 	struct config {
@@ -1231,7 +1231,7 @@ static const char* wdc_purge_mon_status_to_string(__u32 status)
 static int wdc_purge(int argc, char **argv,
 		struct command *command, struct plugin *plugin)
 {
-	char *desc = "Send a Purge command.";
+	const char *desc = "Send a Purge command.";
 	char *err_str;
 	int fd;
 	int ret;
@@ -1272,7 +1272,7 @@ static int wdc_purge(int argc, char **argv,
 static int wdc_purge_monitor(int argc, char **argv,
 		struct command *command, struct plugin *plugin)
 {
-	char *desc = "Send a Purge Monitor command.";
+	const char *desc = "Send a Purge Monitor command.";
 	int fd;
 	int ret;
 	__u8 output[WDC_NVME_PURGE_MONITOR_DATA_LEN];
@@ -1315,7 +1315,7 @@ static int wdc_purge_monitor(int argc, char **argv,
 
 static void wdc_print_log_normal(struct wdc_ssd_perf_stats *perf)
 {
-	printf("  Performance Statistics :- \n");
+	printf("  C1 Log Page Performance Statistics :- \n");
 	printf("  Host Read Commands                             %20"PRIu64"\n",
 			(uint64_t)le64_to_cpu(perf->hr_cmds));
 	printf("  Host Read Blocks                               %20"PRIu64"\n",
@@ -1358,8 +1358,6 @@ static void wdc_print_log_normal(struct wdc_ssd_perf_stats *perf)
 		(uint64_t)le64_to_cpu(perf->nr_blks));
 	printf("  Average NAND Read Size                         %20f\n",
 		safe_div_fp((le64_to_cpu(perf->nr_blks)), (le64_to_cpu((perf->nr_cmds)))));
-	printf("  Host Write Odd Start Commands                  %20"PRIu64"\n",
-			(uint64_t)le64_to_cpu(perf->hw_os_cmds));
 	printf("  Nand Write Commands                            %20"PRIu64"\n",
 			(uint64_t)le64_to_cpu(perf->nw_cmds));
 	printf("  NAND Write Blocks                              %20"PRIu64"\n",
@@ -1415,8 +1413,6 @@ static void wdc_print_log_json(struct wdc_ssd_perf_stats *perf)
 		(uint64_t)le64_to_cpu(perf->nr_blks));
 	json_object_add_value_int(root, "Average NAND Read Size",
 		safe_div_fp((le64_to_cpu(perf->nr_blks)), (le64_to_cpu((perf->nr_cmds)))));
-	json_object_add_value_int(root, "Host Write Odd Start Commands",
-			(uint64_t)le64_to_cpu(perf->hw_os_cmds));
 	json_object_add_value_int(root, "Nand Write Commands",
 			(uint64_t)le64_to_cpu(perf->nw_cmds));
 	json_object_add_value_int(root, "NAND Write Blocks",
@@ -1788,7 +1784,6 @@ static int wdc_get_max_transfer_len(int fd, __u32 *maxTransferLen)
 	struct nvme_id_ctrl ctrl;
 
 	__u32 maxTransferLenDevice = 0;
-	/*__u32 maxTransferLenHost = 0;    * do we need to get the host max transfer length?? */
 
 	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
 	ret = nvme_identify_ctrl(fd, &ctrl);
@@ -1799,13 +1794,6 @@ static int wdc_get_max_transfer_len(int fd, __u32 *maxTransferLen)
 
 	maxTransferLenDevice = (1 << ctrl.mdts) * getpagesize();
 	*maxTransferLen = maxTransferLenDevice;
-
-	/*
-    if( maxTransferLenDevice < maxTransferLenHost)
-	    *maxTransferLen = maxTransferLenDevice;
-    else
-	    *maxTransferLen = maxTransferLenHost;
-	*/
 
 	return ret;
 }
@@ -2292,7 +2280,7 @@ static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 	dataBuffer = calloc(1, elogBufferSize);
 	elogBuffer = (struct nvme_error_log_page *)dataBuffer;
 
-	ret = nvme_error_log(fd, 0, elogNumEntries, elogBuffer);
+	ret = nvme_error_log(fd, elogNumEntries, elogBuffer);
 	if (ret) {
 		fprintf(stderr, "ERROR : WDC : nvme_error_log() failed, ret = %d\n", ret);
 	} else {
@@ -2306,7 +2294,7 @@ static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 
 	/* Get Smart log page  */
 	memset(&smart_log, 0, sizeof (struct nvme_smart_log));
-	ret = nvme_smart_log(fd, 0xffffffff, &smart_log);
+	ret = nvme_smart_log(fd, NVME_NSID_ALL, &smart_log);
 	if (ret) {
 		fprintf(stderr, "ERROR : WDC : nvme_smart_log() failed, ret = %d\n", ret);
 	} else {
@@ -2425,6 +2413,9 @@ static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 		} else {
 			fprintf(stderr, "WDC : wdc_fetch_log_directory failed, ret = %d\n", ret);
 		}
+
+		free(deEssentialsList.logEntry);
+		deEssentialsList.logEntry = NULL;
 	} else {
 		fprintf(stderr, "WDC : wdc_get_log_dir_max_entries failed, ret = %d\n", ret);
 	}
