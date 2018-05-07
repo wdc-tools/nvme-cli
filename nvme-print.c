@@ -1405,6 +1405,8 @@ char *nvme_status_to_string(__u32 status)
 	case NVME_SC_CTRL_LIST_INVALID:		return "CONTROLLER_LIST_INVALID: The controller list provided is invalid";
 	case NVME_SC_BP_WRITE_PROHIBITED:	return "BOOT PARTITION WRITE PROHIBITED: The command is trying to modify a Boot Partition while it is locked";
 	case NVME_SC_BAD_ATTRIBUTES:		return "BAD_ATTRIBUTES: Bad attributes were given";
+	case NVME_SC_INVALID_PI:			return "INVALID PROTECTION INFORMATION: Invalid protection information provided";
+	case NVME_SC_READ_ONLY:				return "READ ONLY: Attempted a write to a read only range";
 	case NVME_SC_WRITE_FAULT:		return "WRITE_FAULT: The write data could not be committed to the media";
 	case NVME_SC_READ_ERROR:		return "READ_ERROR: The read data could not be recovered from the media";
 	case NVME_SC_GUARD_CHECK:		return "GUARD_CHECK: The command was aborted due to an end-to-end guard check failure";
