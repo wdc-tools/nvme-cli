@@ -52,13 +52,13 @@
 #define WDC_NVME_LOG_SIZE_HDR_LEN			0x08
 
 /* Device Config */
-#define WDC_NVME_WDC_VID		        0x1c58
-#define WDC_NVME_WDC_SN100_CNTRL_ID		0x0003
-#define WDC_NVME_WDC_SN200_CNTRL_ID		0x0023
+#define WDC_NVME_VID  					0x1c58
+#define WDC_NVME_SN100_CNTL_ID			0x0003
+#define WDC_NVME_SN200_CNTL_ID			0x0023
 #define WDC_NVME_SNDK_VID		        0x15b7
-#define WDC_NVME_SXSLCL_CNTRL_ID		0x0000
+#define WDC_NVME_SXSLCL_CNTL_ID	    	0x0000
 #define WDC_NVME_ASPEN_VID              0x1b96
-#define WDC_NVME_ASPEN_CNTRL_ID         0x0000
+#define WDC_NVME_ASPEN_CNTL_ID          0x0000
 
 /* Capture Diagnostics */
 #define WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE	WDC_NVME_LOG_SIZE_DATA_LEN
@@ -317,7 +317,7 @@ static int wdc_purge(int argc, char **argv,
 static int wdc_purge_monitor(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
 static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id);
-static int wdc_clear_pcie_correctable_errors(int argc, char **argv, struct command *command,
+static int wdc_clear_pcie_corr(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 static int wdc_do_drive_essentials(int fd, char *dir, char *key);
 static int wdc_drive_essentials(int argc, char **argv, struct command *command,
@@ -398,10 +398,10 @@ struct wdc_c2_cbs_data {
 };
 
 struct __attribute__((__packed__)) wdc_ssd_ca_perf_stats {
-	__le64	nand_bytes_wr_hi;			/* 0x00 - NAND Bytes Written hi				*/
-	__le64	nand_bytes_wr_lo;			/* 0x08 - NAND Bytes Written lo				*/
-	__le64	nand_bytes_rd_hi;			/* 0x10 - NAND Bytes Read hi				*/
-	__le64	nand_bytes_rd_lo;			/* 0x18 - NAND Bytes Read lo				*/
+	__le64	nand_bytes_wr_lo;			/* 0x00 - NAND Bytes Written lo				*/
+	__le64	nand_bytes_wr_hi;			/* 0x08 - NAND Bytes Written hi				*/
+	__le64	nand_bytes_rd_lo;			/* 0x10 - NAND Bytes Read lo				*/
+	__le64	nand_bytes_rd_hi;			/* 0x18 - NAND Bytes Read hi				*/
 	__le64	nand_bad_block;				/* 0x20 - NAND Bad Block Count				*/
 	__le64	uncorr_read_count;			/* 0x28 - Uncorrectable Read Count			*/
 	__le64	ecc_error_count;			/* 0x30 - Soft ECC Error Count				*/
@@ -447,18 +447,15 @@ static int wdc_check_device(int fd)
 	ret = -1;
 
 	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
-	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_WDC_VID) &&
-		((le32_to_cpu(ctrl.cntlid) == WDC_NVME_WDC_SN100_CNTRL_ID) ||
-		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_WDC_SN200_CNTRL_ID)))
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
+		((le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN100_CNTL_ID) ||
+		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN200_CNTL_ID)))
 		ret = 0;
 	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTRL_ID))
+			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTL_ID))
 		ret = 0;
 	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_ASPEN_VID) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_ASPEN_CNTRL_ID))
-		ret = 0;
-	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTRL_ID))
+			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_ASPEN_CNTL_ID))
 		ret = 0;
 	else
 		fprintf(stderr, "WARNING : WDC : Device not supported\n");
@@ -482,8 +479,54 @@ static int wdc_check_device_sxslcl(int fd)
 
 	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTRL_ID))
+			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTL_ID))
 		ret = 0;
+
+	return ret;
+}
+
+static bool wdc_check_device_sn100(int fd)
+{
+	bool ret;
+	struct nvme_id_ctrl ctrl;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return false;
+	}
+
+	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
+		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN100_CNTL_ID))
+		ret = true;
+	else
+		ret = false;
+
+	return ret;
+}
+
+static bool wdc_check_device_sn200(int fd)
+{
+	bool ret;
+	struct nvme_id_ctrl ctrl;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return false;
+	}
+
+	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
+		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN200_CNTL_ID))
+		ret = true;
+	else
+		ret = false;
 
 	return ret;
 }
@@ -1659,36 +1702,17 @@ static int wdc_smart_add_log_c1(int argc, char **argv, struct command *command,
 	return ret;
 }
 
-static int wdc_smart_add_log(int argc, char **argv, struct command *command,
-		struct plugin *plugin)
+
+static int wdc_get_ca_log_page(int fd, char *format)
 {
-	char *desc = "Retrieve additional performance statistics.";
-	__u8 *data;
-	int fd;
 	int ret = 0;
 	int fmt = -1;
+	__u8 *data;
 	struct wdc_ssd_ca_perf_stats *perf;
 
-	struct config {
-		int vendor_specific;
-		char *output_format;
-	};
-
-	struct config cfg = {
-		.output_format = "normal",
-	};
-
-	const struct argconfig_commandline_options command_line_options[] = {
-		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format, required_argument, "Output Format: normal|json" },
-		{NULL}
-	};
-
-	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if (fd < 0)
-		return fd;
 
 	wdc_check_device(fd);
-	fmt = validate_output_format(cfg.output_format);
+	fmt = validate_output_format(format);
 	if (fmt < 0) {
 		fprintf(stderr, "ERROR : WDC : invalid output format\n");
 		return fmt;
@@ -1706,8 +1730,9 @@ static int wdc_smart_add_log(int argc, char **argv, struct command *command,
 	}
 	memset(data, 0, sizeof (__u8) * WDC_CA_LOG_BUF_LEN);
 
-	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE, WDC_CA_LOG_BUF_LEN, data);
-	if (strcmp(cfg.output_format, "json"))
+	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE,
+						WDC_CA_LOG_BUF_LEN, data);
+	if (strcmp(format, "json"))
 		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
 
 	if (ret == 0) {
@@ -1723,7 +1748,124 @@ static int wdc_smart_add_log(int argc, char **argv, struct command *command,
 	return ret;
 }
 
-static int wdc_clear_pcie_correctable_errors(int argc, char **argv, struct command *command,
+static int wdc_get_c1_log_page(int fd, char *format, uint8_t interval)
+{
+	int ret = 0;
+	int fmt = -1;
+	__u8 *data;
+	__u8 *p;
+	int i;
+	int skip_cnt = 4;
+	int total_subpages;
+	struct wdc_log_page_header *l;
+	struct wdc_log_page_subpage_header *sph;
+	struct wdc_ssd_perf_stats *perf;
+
+	wdc_check_device(fd);
+	fmt = validate_output_format(format);
+	if (fmt < 0) {
+		fprintf(stderr, "ERROR : WDC : invalid output format\n");
+		return fmt;
+	}
+
+	if (interval < 1 || interval > 15) {
+		fprintf(stderr, "ERROR : WDC : interval out of range [1-15]\n");
+		return -1;
+	}
+
+	if ((data = (__u8*) malloc(sizeof (__u8) * WDC_ADD_LOG_BUF_LEN)) == NULL) {
+		fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
+		return -1;
+	}
+	memset(data, 0, sizeof (__u8) * WDC_ADD_LOG_BUF_LEN);
+
+	ret = nvme_get_log(fd, 0x01, WDC_NVME_ADD_LOG_OPCODE,
+			   WDC_ADD_LOG_BUF_LEN, data);
+	if (strcmp(format, "json"))
+		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	if (ret == 0) {
+		l = (struct wdc_log_page_header*)data;
+		total_subpages = l->num_subpages + WDC_NVME_GET_STAT_PERF_INTERVAL_LIFETIME - 1;
+		for (i = 0, p = data + skip_cnt; i < total_subpages; i++, p += skip_cnt) {
+			sph = (struct wdc_log_page_subpage_header *) p;
+			if (sph->spcode == WDC_GET_LOG_PAGE_SSD_PERFORMANCE) {
+				if (sph->pcset == interval) {
+					perf = (struct wdc_ssd_perf_stats *) (p + 4);
+					ret = wdc_print_log(perf, fmt);
+					break;
+				}
+			}
+			skip_cnt = le32_to_cpu(sph->subpage_length) + 4;
+		}
+		if (ret) {
+			fprintf(stderr, "ERROR : WDC : Unable to read data from buffer\n");
+		}
+	}
+	free(data);
+	return ret;
+}
+
+static int wdc_smart_add_log(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	const char *desc = "Retrieve additional performance statistics.";
+	const char *interval = "Interval to read the statistics from [1, 15].";
+	int fd;
+	int ret;
+
+	struct config {
+		uint8_t interval;
+		int   vendor_specific;
+		char *output_format;
+	};
+
+	struct config cfg = {
+		.interval = 14,
+		.output_format = "normal",
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"interval", 'i', "NUM", CFG_POSITIVE, &cfg.interval, required_argument, interval},
+		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format, required_argument, "Output Format: normal|json" },
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
+
+	if (wdc_check_device_sn100(fd)) {
+		// Get the C1 Log Page
+		ret = wdc_get_c1_log_page(fd, cfg.output_format, cfg.interval);
+
+		if (ret) {
+			fprintf(stderr, "ERROR : WDC : Unable to read C1 Log Page data from buffer\n");
+			return ret;
+		}
+	}
+	else if (wdc_check_device_sn200(fd)) {
+		// Get the CA and C1 Log Page
+		ret = wdc_get_ca_log_page(fd, cfg.output_format);
+		if (ret) {
+			fprintf(stderr, "ERROR : WDC : Unable to read CA Log Page data from buffer\n");
+			return ret;
+		}
+
+		ret = wdc_get_c1_log_page(fd, cfg.output_format, cfg.interval);
+		if (ret) {
+			fprintf(stderr, "ERROR : WDC : Unable to read C1 Log Page data from buffer\n");
+			return ret;
+		}
+	}
+	else {
+		fprintf(stderr, "INFO : WDC : Command not supported in this device\n");
+	}
+
+	return 0;
+}
+
+static int wdc_clear_pcie_corr(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	char *desc = "Clear PCIE Correctable Errors.";
