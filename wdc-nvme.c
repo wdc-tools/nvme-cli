@@ -535,11 +535,13 @@ static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix)
 {
 	int i;
 	int ret;
+	int res_len = 0;
 	char orig[PATH_MAX] = {0};
 	struct nvme_id_ctrl ctrl;
+	int ctrl_sn_len = sizeof (ctrl.sn);
 
 	i = sizeof (ctrl.sn) - 1;
-	strncpy(orig, file, PATH_MAX);
+	strncpy(orig, file, PATH_MAX - 1);
 	memset(file, 0, len);
 	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
 	ret = nvme_identify_ctrl(fd, &ctrl);
@@ -553,7 +555,17 @@ static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix)
 		ctrl.sn[i] = '\0';
 		i--;
 	}
-	snprintf(file, len, "%s%s%s.bin", orig, ctrl.sn, suffix);
+	if (ctrl.sn[sizeof (ctrl.sn) - 1] == '\0') {
+		ctrl_sn_len = strlen(ctrl.sn);
+	}
+
+	res_len = snprintf(file, len, "%s%.*s%s.bin", orig, ctrl_sn_len, ctrl.sn, suffix);
+	if (len <= res_len) {
+		fprintf(stderr, "ERROR : WDC : cannot format serial number due to data "
+				"of unexpected length\n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -939,7 +951,7 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
-		strncpy(f, cfg.file, PATH_MAX);
+		strncpy(f, cfg.file, PATH_MAX - 1);
 	}
     if (cfg.xfer_size != 0) {
  	   	   xfer_size = cfg.xfer_size;
@@ -990,7 +1002,7 @@ static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
     	   	   xfer_size = cfg.xfer_size;
        }
        if (cfg.file != NULL) {
-    	   strncpy(f, cfg.file, PATH_MAX);
+    	   strncpy(f, cfg.file, PATH_MAX - 1);
        } else {
     		wdc_UtilsGetTime(&timeInfo);
     		memset(timeStamp, 0, sizeof(timeStamp));
@@ -1085,7 +1097,7 @@ static int wdc_crash_dump(int fd, char *file, int type)
 	char dump_type[PATH_MAX] = {0};
 
 	if (file != NULL) {
-		strncpy(f, file, PATH_MAX);
+		strncpy(f, file, PATH_MAX - 1);
 	}
 
 	if (type == WDC_NVME_PFAIL_DUMP_TYPE)
@@ -1148,7 +1160,7 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
-		strncpy(f, cfg.file, PATH_MAX);
+		strncpy(f, cfg.file, PATH_MAX - 1);
 	}
 	if (wdc_get_serial_name(fd, f, PATH_MAX, "drive_log") == -1) {
 		fprintf(stderr, "ERROR : WDC : failed to generate file name\n");
@@ -1731,7 +1743,7 @@ static int wdc_get_ca_log_page(int fd, char *format)
 	memset(data, 0, sizeof (__u8) * WDC_CA_LOG_BUF_LEN);
 
 	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE,
-						WDC_CA_LOG_BUF_LEN, data);
+			WDC_CA_LOG_BUF_LEN, data);
 	if (strcmp(format, "json"))
 		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
 
@@ -2003,50 +2015,50 @@ int wdc_de_VU_read_buffer(int fd, __u32 fileId, __u16 spiDestn, __u32 offsetInDw
 
 int wdc_get_log_dir_max_entries(int fd, __u32* maxNumOfEntries)
 {
-    int     		ret = WDC_STATUS_FAILURE;
-    __u32           headerPayloadSize = 0;
-    __u8*           fileIdOffsetsBuffer = NULL;
-    __u32           fileIdOffsetsBufferSize = 0;
-    __u32           fileNum = 0;
-    __u16           fileOffset = 0;
+	int     		ret = WDC_STATUS_FAILURE;
+	__u32           headerPayloadSize = 0;
+	__u8*           fileIdOffsetsBuffer = NULL;
+	__u32           fileIdOffsetsBufferSize = 0;
+	__u32           fileNum = 0;
+	__u16           fileOffset = 0;
 
 
-    if (!fd || !maxNumOfEntries)
-    {
-        ret = WDC_STATUS_INVALID_PARAMETER;
-        return ret;
-    }
-    /* 1.Get log directory first four bytes */
-    if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_size(fd, 0, 5, (__u32*)&headerPayloadSize)))
-    {
+	if (!fd || !maxNumOfEntries)
+	{
+		ret = WDC_STATUS_INVALID_PARAMETER;
+		return ret;
+	}
+	/* 1.Get log directory first four bytes */
+	if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_size(fd, 0, 5, (__u32*)&headerPayloadSize)))
+	{
 		fprintf(stderr, "ERROR : WDC : %s: Failed to get headerPayloadSize from file directory 0x%x\n",
 				__func__, ret);
-        goto end;
-    }
+		goto end;
+	}
 
-    fileIdOffsetsBufferSize = WDC_DE_FILE_HEADER_SIZE + (headerPayloadSize * WDC_DE_FILE_OFFSET_SIZE);
-    fileIdOffsetsBuffer = (__u8*)calloc(1, fileIdOffsetsBufferSize);
+	fileIdOffsetsBufferSize = WDC_DE_FILE_HEADER_SIZE + (headerPayloadSize * WDC_DE_FILE_OFFSET_SIZE);
+	fileIdOffsetsBuffer = (__u8*)calloc(1, fileIdOffsetsBufferSize);
 
-    /* 2.Read to get file offsets */
-    if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_buffer(fd, 0, 5, 0, fileIdOffsetsBuffer, &fileIdOffsetsBufferSize)))
-    {
+	/* 2.Read to get file offsets */
+	if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_buffer(fd, 0, 5, 0, fileIdOffsetsBuffer, &fileIdOffsetsBufferSize)))
+	{
 		fprintf(stderr, "ERROR : WDC : %s: Failed to get fileIdOffsets from file directory 0x%x\n",
 				__func__, ret);
-        goto end;
-    }
-    /* 3.Determine valid entries */
-    for (fileNum = 0; fileNum < (headerPayloadSize - WDC_DE_FILE_HEADER_SIZE) / WDC_DE_FILE_OFFSET_SIZE; fileNum++)
-    {
-        fileOffset = (fileIdOffsetsBuffer[WDC_DE_FILE_HEADER_SIZE + (fileNum * WDC_DE_FILE_OFFSET_SIZE)] << 8) +
-            fileIdOffsetsBuffer[WDC_DE_FILE_HEADER_SIZE + (fileNum * WDC_DE_FILE_OFFSET_SIZE) + 1];
-        if (!fileOffset)
-            continue;
-        (*maxNumOfEntries)++;
-    }
-end:
-    if (!fileIdOffsetsBuffer)
-        free(fileIdOffsetsBuffer);
-    return ret;
+		goto end;
+	}
+	/* 3.Determine valid entries */
+	for (fileNum = 0; fileNum < (headerPayloadSize - WDC_DE_FILE_HEADER_SIZE) / WDC_DE_FILE_OFFSET_SIZE; fileNum++)
+	{
+		fileOffset = (fileIdOffsetsBuffer[WDC_DE_FILE_HEADER_SIZE + (fileNum * WDC_DE_FILE_OFFSET_SIZE)] << 8) +
+				fileIdOffsetsBuffer[WDC_DE_FILE_HEADER_SIZE + (fileNum * WDC_DE_FILE_OFFSET_SIZE) + 1];
+		if (!fileOffset)
+			continue;
+		(*maxNumOfEntries)++;
+	}
+	end:
+	if (!fileIdOffsetsBuffer)
+		free(fileIdOffsetsBuffer);
+	return ret;
 }
 
 WDC_DRIVE_ESSENTIAL_TYPE wdc_get_essential_type(__u8 fileName[])
@@ -2071,80 +2083,79 @@ WDC_DRIVE_ESSENTIAL_TYPE wdc_get_essential_type(__u8 fileName[])
 
 int wdc_fetch_log_directory(int fd, PWDC_DE_VU_LOG_DIRECTORY directory)
 {
-    int             ret = WDC_STATUS_FAILURE;
-    __u8            *fileOffset = NULL;
-    __u8            *fileDirectory = NULL;
-    __u32           headerSize = 0;
-    __u32           fileNum = 0, startIdx = 0;
-    __u16           fileOffsetTemp = 0;
-    __u32           entryId = 0;
-    __u32           fileDirectorySize = 0;
+	int             ret = WDC_STATUS_FAILURE;
+	__u8            *fileOffset = NULL;
+	__u8            *fileDirectory = NULL;
+	__u32           headerSize = 0;
+	__u32           fileNum = 0, startIdx = 0;
+	__u16           fileOffsetTemp = 0;
+	__u32           entryId = 0;
+	__u32           fileDirectorySize = 0;
 
-    if (!fd || !directory)
-    {
-        ret = WDC_STATUS_INVALID_PARAMETER;
-        goto end;
-    }
+	if (!fd || !directory)
+	{
+		ret = WDC_STATUS_INVALID_PARAMETER;
+		goto end;
+	}
 
-    if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_size(fd, 0, 5, &fileDirectorySize)))
-    {
+	if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_size(fd, 0, 5, &fileDirectorySize)))
+	{
 		fprintf(stderr, "ERROR : WDC : %s: Failed to get filesystem directory size, ret = %d\n",
 				__func__, ret);
-        goto end;
-    }
+		goto end;
+	}
 
-    fileDirectory = (__u8*)calloc(1, fileDirectorySize);
-    if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_buffer(fd, 0, 5, 0, fileDirectory, &fileDirectorySize)))
-    {
+	fileDirectory = (__u8*)calloc(1, fileDirectorySize);
+	if (WDC_STATUS_SUCCESS != (ret = wdc_de_VU_read_buffer(fd, 0, 5, 0, fileDirectory, &fileDirectorySize)))
+	{
 		fprintf(stderr, "ERROR : WDC : %s: Failed to get filesystem directory, ret = %d\n",
 				__func__, ret);
-        goto end;
-    }
+		goto end;
+	}
 
-    /* First four bytes of header directory is headerSize */
-    memcpy(&headerSize, fileDirectory, WDC_DE_FILE_HEADER_SIZE);
+	/* First four bytes of header directory is headerSize */
+	memcpy(&headerSize, fileDirectory, WDC_DE_FILE_HEADER_SIZE);
 
-    if (directory->maxNumLogEntries == 0) //minimum buffer for 1 entry is required
-    {
-        ret = WDC_STATUS_INVALID_PARAMETER;
-        goto end;
-    }
+	if (directory->maxNumLogEntries == 0) //minimum buffer for 1 entry is required
+	{
+		ret = WDC_STATUS_INVALID_PARAMETER;
+		goto end;
+	}
 
-    for (fileNum = 0; fileNum < (headerSize - WDC_DE_FILE_HEADER_SIZE) / WDC_DE_FILE_OFFSET_SIZE; fileNum++)
-    {
-        if (entryId >= directory->maxNumLogEntries)
-            break;
-        startIdx = WDC_DE_FILE_HEADER_SIZE + (fileNum * WDC_DE_FILE_OFFSET_SIZE);
-        memcpy(&fileOffsetTemp, fileDirectory + startIdx, sizeof(fileOffsetTemp));
-        fileOffset = fileDirectory + fileOffsetTemp;
+	for (fileNum = 0; fileNum < (headerSize - WDC_DE_FILE_HEADER_SIZE) / WDC_DE_FILE_OFFSET_SIZE; fileNum++)
+	{
+		if (entryId >= directory->maxNumLogEntries)
+			break;
+		startIdx = WDC_DE_FILE_HEADER_SIZE + (fileNum * WDC_DE_FILE_OFFSET_SIZE);
+		memcpy(&fileOffsetTemp, fileDirectory + startIdx, sizeof(fileOffsetTemp));
+		fileOffset = fileDirectory + fileOffsetTemp;
 
-        if (0 == fileOffsetTemp)
-        {
-            continue;
-        }
+		if (0 == fileOffsetTemp)
+		{
+			continue;
+		}
 
-        memset(&directory->logEntry[entryId], 0, sizeof(WDC_DRIVE_ESSENTIALS));
-        memcpy(&directory->logEntry[entryId].metaData, fileOffset, sizeof(WDC_DE_VU_FILE_META_DATA));
-        directory->logEntry[entryId].metaData.fileName[WDC_DE_FILE_NAME_SIZE - 1] = '\0';
-        wdc_UtilsDeleteCharFromString((char*)directory->logEntry[entryId].metaData.fileName, WDC_DE_FILE_NAME_SIZE, ' ');
-        if (0 == directory->logEntry[entryId].metaData.fileID)
-        {
-            continue;
-        }
-        directory->logEntry[entryId].essentialType = wdc_get_essential_type(directory->logEntry[entryId].metaData.fileName);
-        /*
-		fprintf(stderr, "WDC : %s: NVMe VU Log Entry %d, fileName = %s, fileSize = 0x%lx, fileId = 0x%x\n",
-				__func__, entryId, directory->logEntry[entryId].metaData.fileName,
-				(long unsigned int)directory->logEntry[entryId].metaData.fileSize, directory->logEntry[entryId].metaData.fileID);
-		*/
-        entryId++;
-    }
-    directory->numOfValidLogEntries = entryId;
-end:
-    if (fileDirectory != NULL)
-        free(fileDirectory);
+		memset(&directory->logEntry[entryId], 0, sizeof(WDC_DRIVE_ESSENTIALS));
+		memcpy(&directory->logEntry[entryId].metaData, fileOffset, sizeof(WDC_DE_VU_FILE_META_DATA));
+		directory->logEntry[entryId].metaData.fileName[WDC_DE_FILE_NAME_SIZE - 1] = '\0';
+		wdc_UtilsDeleteCharFromString((char*)directory->logEntry[entryId].metaData.fileName, WDC_DE_FILE_NAME_SIZE, ' ');
+		if (0 == directory->logEntry[entryId].metaData.fileID)
+		{
+			continue;
+		}
+		directory->logEntry[entryId].essentialType = wdc_get_essential_type(directory->logEntry[entryId].metaData.fileName);
+		/*fprintf(stderr, "WDC : %s: NVMe VU Log Entry %d, fileName = %s, fileSize = 0x%lx, fileId = 0x%x\n",
+			__func__, entryId, directory->logEntry[entryId].metaData.fileName,
+			(long unsigned int)directory->logEntry[entryId].metaData.fileSize, directory->logEntry[entryId].metaData.fileID);
+		 */
+		entryId++;
+	}
+	directory->numOfValidLogEntries = entryId;
+	end:
+	if (fileDirectory != NULL)
+		free(fileDirectory);
 
-    return ret;
+	return ret;
 }
 
 int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 fileSize, __u8* dataBuffer)
@@ -2167,7 +2178,7 @@ int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 f
 	if ((fileSize >= maximumTransferLength) || (fileSize > 0xffffffff))
 	{
 		chunckSize = WDC_DE_VU_READ_BUFFER_STANDARD_OFFSET;
-    	if (maximumTransferLength < WDC_DE_VU_READ_BUFFER_STANDARD_OFFSET)
+		if (maximumTransferLength < WDC_DE_VU_READ_BUFFER_STANDARD_OFFSET)
 			chunckSize = maximumTransferLength;
 
 		buffSize = chunckSize;
@@ -2177,7 +2188,7 @@ int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 f
 				buffSize = (__u32)(fileSize - (offsetIdx * chunckSize));
 			/* Limitation in VU read buffer - offsetIdx and bufferSize are not greater than u32 */
 			ret = wdc_de_VU_read_buffer(fd, fileId, spiDestn,
-				(__u32)((offsetIdx * chunckSize) / sizeof(__u32)), dataBuffer + (offsetIdx * chunckSize), &buffSize);
+					(__u32)((offsetIdx * chunckSize) / sizeof(__u32)), dataBuffer + (offsetIdx * chunckSize), &buffSize);
 			if (ret != WDC_STATUS_SUCCESS)
 			{
 				fprintf(stderr, "ERROR : WDC : %s: wdc_de_VU_read_buffer failed with ret = %d, fileId = 0x%x, fileSize = 0x%lx\n",
@@ -2188,7 +2199,7 @@ int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 f
 	} else {
 		buffSize = (__u32)fileSize;
 		ret = wdc_de_VU_read_buffer(fd, fileId, spiDestn,
-			(__u32)((offsetIdx * chunckSize) / sizeof(__u32)), dataBuffer, &buffSize);
+				(__u32)((offsetIdx * chunckSize) / sizeof(__u32)), dataBuffer, &buffSize);
 		if (ret != WDC_STATUS_SUCCESS)
 		{
 			fprintf(stderr, "ERROR : WDC : %s: wdc_de_VU_read_buffer failed with ret = %d, fileId = 0x%x, fileSize = 0x%lx\n",
@@ -2196,7 +2207,7 @@ int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 f
 		}
 	}
 
-end:
+	end:
 	return ret;
 }
 
@@ -2305,7 +2316,7 @@ int wdc_de_get_dump_trace(int fd, char * filePath, __u16 binFileNameLen, char *b
 static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 {
 	int ret = 0;
-    void *retPtr;
+	void *retPtr;
 	char                      fileName[MAX_PATH_LEN];
 	__s8                      bufferFolderPath[MAX_PATH_LEN];
 	char                      bufferFolderName[MAX_PATH_LEN];
@@ -2378,7 +2389,7 @@ static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 		retPtr = getcwd((char*)currDir, MAX_PATH_LEN);
 		if (retPtr != NULL)
 			wdc_UtilsSnprintf((char*)bufferFolderPath, MAX_PATH_LEN, "%s%s%s",
-				(char *)currDir, WDC_DE_PATH_SEPARATOR, (char *)bufferFolderName);
+					(char *)currDir, WDC_DE_PATH_SEPARATOR, (char *)bufferFolderName);
 		else {
 			fprintf(stderr, "ERROR : WDC : get current working directory failed\n");
 			return -1;
@@ -2467,7 +2478,8 @@ static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 		dataBuffer = calloc(1, dataBufferSize);
 		memset(dataBuffer, 0, dataBufferSize);
 
-		ret = nvme_get_log(fd, WDC_DE_GLOBAL_NSID, deVULogPagesList[vuLogIdx].logPageId, dataBufferSize, dataBuffer);
+		ret = nvme_get_log(fd, WDC_DE_GLOBAL_NSID, deVULogPagesList[vuLogIdx].logPageId,
+				dataBufferSize, dataBuffer);
 		if (ret) {
 			fprintf(stderr, "ERROR : WDC : nvme_get_log() for log page 0x%x failed, ret = %d\n",
 					deVULogPagesList[vuLogIdx].logPageId, ret);
@@ -2604,13 +2616,13 @@ static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 	};
 
 	struct config cfg = {
-		.dirName = NULL,
+			.dirName = NULL,
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
-		{"dir-name", 'd', "DIRECTORY", CFG_STRING, &cfg.dirName, required_argument, dirName},
-		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
-		{NULL}
+			{"dir-name", 'd', "DIRECTORY", CFG_STRING, &cfg.dirName, required_argument, dirName},
+			{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+			{NULL}
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
@@ -2623,7 +2635,7 @@ static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 	}
 
 	if (cfg.dirName != NULL) {
-		strncpy(d, cfg.dirName, PATH_MAX);
+		strncpy(d, cfg.dirName, PATH_MAX - 1);
 		d_ptr = d;
 	} else {
 		d_ptr = NULL;
