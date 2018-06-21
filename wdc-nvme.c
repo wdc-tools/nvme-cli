@@ -57,8 +57,8 @@
 #define WDC_NVME_SN200_CNTL_ID			0x0023
 #define WDC_NVME_SNDK_VID		        0x15b7
 #define WDC_NVME_SXSLCL_CNTL_ID	    	0x0000
-#define WDC_NVME_ASPEN_VID              0x1b96
-#define WDC_NVME_ASPEN_CNTL_ID          0x0000
+#define WDC_NVME_VID_2        			0x1b96
+#define WDC_NVME_SN310_CNTL_ID			0x0000
 
 /* Capture Diagnostics */
 #define WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE	WDC_NVME_LOG_SIZE_DATA_LEN
@@ -141,6 +141,10 @@
 /* CA Log Page */
 #define WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE			0xCA
 #define WDC_CA_LOG_BUF_LEN							0x80
+
+/* D0 Smart Log Page */
+#define WDC_NVME_GET_VU_SMART_LOG_OPCODE			0xD0
+#define WDC_NVME_VU_SMART_LOG_LEN       			0x200
 
 /* Drive Essentials */
 #define WDC_DE_DEFAULT_NUMBER_OF_ERROR_ENTRIES		64
@@ -421,6 +425,33 @@ struct __attribute__((__packed__)) wdc_ssd_ca_perf_stats {
 	__le32	rsvd2;						/* 0x7C - Reserved							*/
 };
 
+struct __attribute__((__packed__)) wdc_ssd_d0_smart_log {
+    __le32  lifetime_wrt_amp_factor;              /* 0x00 - Lifetime write amplification factor         */
+    __le32  trailing_hr_wrt_amp_factor;           /* 0x04 - Trailing hour write amplification factor    */
+    __le32  percentage_pe_cycles_remaining;       /* 0x08 - Percentage of P/E cycles remaining          */
+    __le32  lifetime_link_rate_downgrade_count;   /* 0x0C - Lifetime link rate downgrade count          */
+    __le32  lifetime_block_erase_fail_count;      /* 0x10 - Lifetime block erase fail count             */
+    __le32  lifetime_program_fail_count;          /* 0x14 - Lifetime program fail count                 */
+    __le64  lifetime_user_writes;                 /* 0x18 - Lifetime user writes                        */
+    __le64  lifetime_nand_writes;                 /* 0x20 - Lifetime NAND writes                        */
+    __le64  lifetime_user_reads;                  /* 0x28 - Lifetime user reads                         */
+    __le32  lifetime_retired_block_count;         /* 0x30 - Lifetime retired block count                */
+    __le32  lifetime_read_disturb_realloc_events; /* 0x34 - Lifetime read disturb reallocation events   */
+    __le32  lifetime_die_failure_count;           /* 0x38 - Lifetime die failure count                  */
+    __le32  current_temp;                         /* 0x3C - Current temperature                         */
+    __le32  max_recorded_temp;                    /* 0x40 - Max recorded temperature                    */
+    __le32  lifetime_thermal_throttle_act;        /* 0x44 - Lifetime thermal throttle activations       */
+    __le32  capacitor_health;                     /* 0x48 - Capacitor health                            */
+    __le32  reserve_erase_block_count;            /* 0x4C - Reserve erase block count                   */
+    __le32  lifetime_uecc_count;                  /* 0x50 - Lifetime UECC count                         */
+    __le32  lifetime_realloc_erase_block_count;   /* 0x54 - Lifetime reallocated erase block count      */
+    __le32  lifetime_power_on_hours;              /* 0x58 - Lifetime power on hours                     */
+    __le32  power_loss_counters;                  /* 0x5C - Power loss counters                         */
+    __le32  lifetime_clean_shutdown_count;        /* 0x60 - Lifetime clean shutdown count on power loss */
+    __le32  lifetime_unclean_shutdown_count;      /* 0x64 - Lifetime unclean shutdowns on power loss    */
+    __u8    rsvd_104[0x198];                      /* 0x68-0x1FF Reserved                                */
+};
+
 static double safe_div_fp(double numerator, double denominator)
 {
 	return denominator ? numerator / denominator : 0;
@@ -454,8 +485,8 @@ static int wdc_check_device(int fd)
 	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
 			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTL_ID))
 		ret = 0;
-	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_ASPEN_VID) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_ASPEN_CNTL_ID))
+	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
+			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN310_CNTL_ID))
 		ret = 0;
 	else
 		fprintf(stderr, "WARNING : WDC : Device not supported\n");
@@ -524,6 +555,29 @@ static bool wdc_check_device_sn200(int fd)
 	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
 		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN200_CNTL_ID))
+		ret = true;
+	else
+		ret = false;
+
+	return ret;
+}
+
+static bool wdc_check_device_sn310(int fd)
+{
+	bool ret;
+	struct nvme_id_ctrl ctrl;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return false;
+	}
+
+	/* WDC : PCI Vendor ID along with the controller ID used to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
+		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN310_CNTL_ID))
 		ret = true;
 	else
 		ret = false;
@@ -1616,6 +1670,114 @@ static void wdc_print_ca_log_json(struct wdc_ssd_ca_perf_stats *perf)
 	json_free_object(root);
 }
 
+static void wdc_print_d0_log_normal(struct wdc_ssd_d0_smart_log *perf)
+{
+	printf("  D0 Smart Log Page Statistics :- \n");
+	printf("  Lifetime Write Amplification Factor	         %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_wrt_amp_factor));
+	printf("  Trailing Hour Write Amplification Factor  	 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->trailing_hr_wrt_amp_factor));
+	printf("  Percentage of P/E Cycles Remaining             %20"PRIu32"%%\n",
+			(uint32_t)le32_to_cpu(perf->percentage_pe_cycles_remaining));
+	printf("  Lifetime Link Rate Downgrade Count	         %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_link_rate_downgrade_count));
+	printf("  Lifetime Block Erase Fail Count		 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_block_erase_fail_count));
+	printf("  Lifetime Program Fail Count	     	         %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_program_fail_count));
+	printf("  Lifetime User Writes	                         %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->lifetime_user_writes));
+	printf("  Lifetime NAND Writes	                         %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->lifetime_nand_writes));
+	printf("  Lifetime User Reads	                         %20"PRIu64"\n",
+			(uint64_t)le64_to_cpu(perf->lifetime_user_reads));
+	printf("  Lifetime Retired Block Count	                 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_retired_block_count));
+	printf("  Lifetime Read Disturb Reallocation Events	 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_read_disturb_realloc_events));
+	printf("  Lifetime Die Failure Count	                 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_die_failure_count));
+	printf("  Current Temperature 	                         %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->current_temp));
+	printf("  Max Recorded Temperature			 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->max_recorded_temp));
+	printf("  Lifetime Thermal Throttle Activations	         %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_thermal_throttle_act));
+	printf("  Capacitor Health			 	 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->capacitor_health));
+	printf("  Reserve Erase Block Count	                 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->reserve_erase_block_count));
+	printf("  Lifetime UECC Count	                         %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_uecc_count));
+	printf("  Lifetime Reallocated Erase Block Count	 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_realloc_erase_block_count));
+	printf("  Lifetime Power on Hours			 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_power_on_hours));
+	printf("  Power Loss Counters		         	 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->power_loss_counters));
+	printf("  Lifetime Clean Shutdown Count on Power Loss	 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_clean_shutdown_count));
+	printf("  Lifetime Unclean Shutdowns on Power Loss	 %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(perf->lifetime_unclean_shutdown_count));
+}
+
+static void wdc_print_d0_log_json(struct wdc_ssd_d0_smart_log *perf)
+{
+	struct json_object *root;
+
+	root = json_create_object();
+	json_object_add_value_int(root, "Lifetime Write Amplification Factor",
+			le32_to_cpu(perf->lifetime_wrt_amp_factor));
+	json_object_add_value_int(root, "Trailing Hour Write Amplification Factor",
+			le32_to_cpu(perf->trailing_hr_wrt_amp_factor));
+	json_object_add_value_int(root, "Percentage of P/E Cycles Remaining",
+			le32_to_cpu(perf->percentage_pe_cycles_remaining));
+	json_object_add_value_int(root, "Lifetime Link Rate Downgrade Count",
+			le32_to_cpu(perf->lifetime_link_rate_downgrade_count));
+	json_object_add_value_int(root, "Lifetime Block Erase Fail Count",
+			le32_to_cpu(perf->lifetime_block_erase_fail_count));
+	json_object_add_value_int(root, "Lifetime Program Fail Count",
+			le32_to_cpu(perf->lifetime_program_fail_count));
+	json_object_add_value_int(root, "Lifetime User Writes",
+			le64_to_cpu(perf->lifetime_user_writes));
+	json_object_add_value_int(root, "Lifetime NAND Writes",
+			le64_to_cpu(perf->lifetime_nand_writes));
+	json_object_add_value_int(root, "Lifetime User Reads",
+			le64_to_cpu(perf->lifetime_user_reads));
+	json_object_add_value_int(root, "Lifetime Retired Block Count",
+			le32_to_cpu(perf->lifetime_retired_block_count));
+	json_object_add_value_int(root, "Lifetime Read Disturb Reallocation Events",
+			le32_to_cpu(perf->lifetime_read_disturb_realloc_events));
+	json_object_add_value_int(root, "Lifetime Die Failure Count",
+			le32_to_cpu(perf->lifetime_die_failure_count));
+	json_object_add_value_int(root, "Current Temperature",
+			le32_to_cpu(perf->current_temp));
+	json_object_add_value_int(root, "Max Recorded Temperature",
+			le32_to_cpu(perf->max_recorded_temp));
+	json_object_add_value_int(root, "Lifetime Thermal Throttle Activations",
+			le32_to_cpu(perf->lifetime_thermal_throttle_act));
+	json_object_add_value_int(root, "Capacitor Health",
+			le32_to_cpu(perf->capacitor_health));
+	json_object_add_value_int(root, "Reserve Erase Block Count",
+			le32_to_cpu(perf->reserve_erase_block_count));
+	json_object_add_value_int(root, "Lifetime UECC Count",
+			le32_to_cpu(perf->lifetime_uecc_count));
+	json_object_add_value_int(root, "Lifetime Reallocated Erase Block Count",
+			le32_to_cpu(perf->lifetime_realloc_erase_block_count));
+	json_object_add_value_int(root, "Lifetime Power on Hours",
+			le32_to_cpu(perf->lifetime_power_on_hours));
+	json_object_add_value_int(root, "Power Loss Counters",
+			le32_to_cpu(perf->power_loss_counters));
+	json_object_add_value_int(root, "Lifetime Clean Shutdown Count on Power Loss",
+			le32_to_cpu(perf->lifetime_clean_shutdown_count));
+	json_object_add_value_int(root, "Lifetime Unclean Shutdowns on Power Loss",
+			le32_to_cpu(perf->lifetime_unclean_shutdown_count));
+
+	json_print_object(root, NULL);
+	printf("\n");
+	json_free_object(root);
+}
+
 static int wdc_print_ca_log(struct wdc_ssd_ca_perf_stats *perf, int fmt)
 {
 	if (!perf) {
@@ -1628,6 +1790,23 @@ static int wdc_print_ca_log(struct wdc_ssd_ca_perf_stats *perf, int fmt)
 		break;
 	case JSON:
 		wdc_print_ca_log_json(perf);
+		break;
+	}
+	return 0;
+}
+
+static int wdc_print_d0_log(struct wdc_ssd_d0_smart_log *perf, int fmt)
+{
+	if (!perf) {
+		fprintf(stderr, "ERROR : WDC : Invalid buffer to read perf stats\n");
+		return -1;
+	}
+	switch (fmt) {
+	case NORMAL:
+		wdc_print_d0_log_normal(perf);
+		break;
+	case JSON:
+		wdc_print_d0_log_json(perf);
 		break;
 	}
 	return 0;
@@ -1817,6 +1996,52 @@ static int wdc_get_c1_log_page(int fd, char *format, uint8_t interval)
 	return ret;
 }
 
+static int wdc_get_d0_log_page(int fd, char *format)
+{
+	int ret = 0;
+	int fmt = -1;
+	__u8 *data;
+	struct wdc_ssd_d0_smart_log *perf;
+
+
+	wdc_check_device(fd);
+	fmt = validate_output_format(format);
+	if (fmt < 0) {
+		fprintf(stderr, "ERROR : WDC : invalid output format\n");
+		return fmt;
+	}
+
+	/* verify the 0xD0 log page is supported */
+	if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_VU_SMART_LOG_OPCODE)) {
+		fprintf(stderr, "ERROR : WDC : 0xD0 Log Page not supported\n");
+		return -1;
+	}
+
+	if ((data = (__u8*) malloc(sizeof (__u8) * WDC_NVME_VU_SMART_LOG_LEN)) == NULL) {
+		fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
+		return -1;
+	}
+	memset(data, 0, sizeof (__u8) * WDC_NVME_VU_SMART_LOG_LEN);
+
+	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_VU_SMART_LOG_OPCODE,
+			WDC_NVME_VU_SMART_LOG_LEN, data);
+	if (strcmp(format, "json"))
+		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+
+	if (ret == 0) {
+		/* parse the data */
+		perf = (struct wdc_ssd_d0_smart_log *)(data);
+		ret = wdc_print_d0_log(perf, fmt);
+	} else {
+		fprintf(stderr, "ERROR : WDC : Unable to read D0 Log Page data\n");
+		ret = -1;
+	}
+
+	free(data);
+	return ret;
+}
+
+
 static int wdc_smart_add_log(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
@@ -1867,6 +2092,47 @@ static int wdc_smart_add_log(int argc, char **argv, struct command *command,
 		ret = wdc_get_c1_log_page(fd, cfg.output_format, cfg.interval);
 		if (ret) {
 			fprintf(stderr, "ERROR : WDC : Unable to read C1 Log Page data from buffer\n");
+			return ret;
+		}
+	}
+	else {
+		fprintf(stderr, "INFO : WDC : Command not supported in this device\n");
+	}
+
+	return 0;
+}
+
+static int wdc_smart_add_log_d0(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	const char *desc = "Retrieve additional performance statistics.";
+	int fd;
+	int ret;
+
+	struct config {
+		char *output_format;
+	};
+
+	struct config cfg = {
+		.output_format = "normal",
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format, required_argument, "Output Format: normal|json" },
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
+
+	if (wdc_check_device_sn310(fd)) {
+		// Get the D0 Log Page
+		ret = wdc_get_d0_log_page(fd, cfg.output_format);
+
+		if (ret) {
+			fprintf(stderr, "ERROR : WDC : Unable to read D0 Log Page data from buffer\n");
 			return ret;
 		}
 	}
