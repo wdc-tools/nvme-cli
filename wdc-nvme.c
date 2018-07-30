@@ -53,12 +53,15 @@
 
 /* Device Config */
 #define WDC_NVME_VID  					0x1c58
-#define WDC_NVME_SN100_CNTL_ID			0x0003
-#define WDC_NVME_SN200_CNTL_ID			0x0023
-#define WDC_NVME_SNDK_VID		        0x15b7
-#define WDC_NVME_SXSLCL_CNTL_ID	    	0x0000
+#define WDC_NVME_SN100_DEV_ID			0x0003
+#define WDC_NVME_SN200_DEV_ID			0x0023
 #define WDC_NVME_VID_2        			0x1b96
-#define WDC_NVME_SN310_CNTL_ID			0x0000
+#define WDC_NVME_SN310_DEV_ID			0x2200
+#define WDC_NVME_SNDK_VID		        0x15b7
+#define WDC_NVME_SXSLCL_DEV_ID  		0x2001
+#define WDC_NVME_SN520_DEV_ID_1  		0x5003
+#define WDC_NVME_SN520_DEV_ID_2  		0x5005
+#define WDC_NVME_SN720_DEV_ID   		0x5002
 
 /* Capture Diagnostics */
 #define WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE	WDC_NVME_LOG_SIZE_DATA_LEN
@@ -69,6 +72,10 @@
 
 #define WDC_NVME_CRASH_DUMP_TYPE			1
 #define WDC_NVME_PFAIL_DUMP_TYPE			2
+
+/* Capture Device Unit Info */
+#define WDC_NVME_CAP_DUI_HEADER_SIZE  		0x400
+#define WDC_NVME_CAP_DUI_OPCODE      		0xFA
 
 /* Crash dump */
 #define WDC_NVME_CRASH_DUMP_SIZE_DATA_LEN	WDC_NVME_LOG_SIZE_DATA_LEN
@@ -338,6 +345,15 @@ struct wdc_e6_log_hdr {
 	__u8	log_size[4];
 };
 
+/* DUI log header */
+struct wdc_dui_log_hdr {
+	__u8    telemetry_hdr[512];
+	__le16	hdr_version;
+	__le16	section_count;
+	__u8	log_size[4];
+	__u8    log_data[504];
+};
+
 /* Purge monitor response */
 struct wdc_nvme_purge_monitor_data {
 	__le16 	rsvd1;
@@ -463,63 +479,53 @@ static double calc_percent(uint64_t numerator, uint64_t denominator)
 		(uint64_t)(((double)numerator / (double)denominator) * 100) : 0;
 }
 
-static int wdc_check_device(int fd)
+static int wdc_get_pci_dev_id(int *device_id)
 {
-	int ret;
-	struct nvme_id_ctrl ctrl;
+	int fd, ret = -1;
+	char *base, path[512], *id;
 
-	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
-	ret = nvme_identify_ctrl(fd, &ctrl);
-	if (ret) {
-		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
-				"0x%x\n", ret);
+	base = nvme_char_from_block((char *)devicename);
+	sprintf(path, "/sys/class/nvme/%s/device/device", base);
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		sprintf(path, "/sys/class/misc/%s/device/device", base);
+		fd = open(path, O_RDONLY);
+	}
+	if (fd < 0) {
+		fprintf(stderr, "%s: did not find a pci device\n", __func__);
 		return -1;
 	}
-	ret = -1;
 
-	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
-	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
-		((le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN100_CNTL_ID) ||
-		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN200_CNTL_ID)))
-		ret = 0;
-	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTL_ID))
-		ret = 0;
-	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN310_CNTL_ID))
-		ret = 0;
-	else
-		fprintf(stderr, "WARNING : WDC : Device not supported\n");
+	id = calloc(1, 32);
+	if (!id)
+		goto close_fd;
 
+	ret = read(fd, id, 32);
+	if (ret < 0) {
+		fprintf(stderr, "%s: Read of pci device id failed\n", __func__);
+	} else {
+		if (id[strlen(id) - 1] == '\n')
+			id[strlen(id) - 1] = '\0';
+
+		/* convert the device id string to an int  */
+		*device_id = (int)strtol(&id[2], NULL, 16);
+		ret = 0;
+	}
+
+	free(id);
+
+close_fd:
+	close(fd);
 	return ret;
 }
 
-static int wdc_check_device_sxslcl(int fd)
+static bool wdc_check_device(int fd)
 {
 	int ret;
+	bool supported;
 	struct nvme_id_ctrl ctrl;
-
-	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
-	ret = nvme_identify_ctrl(fd, &ctrl);
-	if (ret) {
-		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
-				"0x%x\n", ret);
-		return -1;
-	}
-	ret = -1;
-
-	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
-	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
-			(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SXSLCL_CNTL_ID))
-		ret = 0;
-
-	return ret;
-}
-
-static bool wdc_check_device_sn100(int fd)
-{
-	bool ret;
-	struct nvme_id_ctrl ctrl;
+	int device_id;
 
 	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
 	ret = nvme_identify_ctrl(fd, &ctrl);
@@ -529,9 +535,77 @@ static bool wdc_check_device_sn100(int fd)
 		return false;
 	}
 
-	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return false;
+
+	supported = false;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
-		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN100_CNTL_ID))
+		((device_id == WDC_NVME_SN100_DEV_ID) ||
+		(device_id == WDC_NVME_SN200_DEV_ID)))
+		supported = true;
+	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
+			(device_id == WDC_NVME_SXSLCL_DEV_ID))
+		supported = true;
+	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
+			(device_id == WDC_NVME_SN310_DEV_ID))
+		supported = true;
+	else
+		fprintf(stderr, "WARNING : WDC not supported, Vendor ID = 0x%x, Device ID = 0x%x\n", le32_to_cpu(ctrl.vid), device_id);
+
+	return supported;
+}
+
+static int wdc_check_device_sxslcl(int fd)
+{
+	int ret;
+	struct nvme_id_ctrl ctrl;
+	int device_id;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return -1;
+	}
+	ret = -1;
+
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return -1;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
+			(device_id == WDC_NVME_SXSLCL_DEV_ID))
+		ret = 0;
+
+	return ret;
+}
+
+static bool wdc_check_device_sn100(int fd)
+{
+	bool ret;
+	struct nvme_id_ctrl ctrl;
+	int device_id;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return false;
+	}
+
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return false;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
+			(device_id == WDC_NVME_SN100_DEV_ID))
 		ret = true;
 	else
 		ret = false;
@@ -543,6 +617,7 @@ static bool wdc_check_device_sn200(int fd)
 {
 	bool ret;
 	struct nvme_id_ctrl ctrl;
+	int device_id;
 
 	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
 	ret = nvme_identify_ctrl(fd, &ctrl);
@@ -552,9 +627,13 @@ static bool wdc_check_device_sn200(int fd)
 		return false;
 	}
 
-	/* WDC : ctrl->cntlid == PCI Device ID, use that with VID to identify WDC Devices */
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return false;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
-		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN200_CNTL_ID))
+			(device_id == WDC_NVME_SN200_DEV_ID))
 		ret = true;
 	else
 		ret = false;
@@ -566,6 +645,7 @@ static bool wdc_check_device_sn310(int fd)
 {
 	bool ret;
 	struct nvme_id_ctrl ctrl;
+	int device_id;
 
 	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
 	ret = nvme_identify_ctrl(fd, &ctrl);
@@ -575,9 +655,70 @@ static bool wdc_check_device_sn310(int fd)
 		return false;
 	}
 
-	/* WDC : PCI Vendor ID along with the controller ID used to identify WDC Devices */
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return false;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
-		(le32_to_cpu(ctrl.cntlid) == WDC_NVME_SN310_CNTL_ID))
+			(device_id == WDC_NVME_SN310_DEV_ID))
+		ret = true;
+	else
+		ret = false;
+
+	return ret;
+}
+
+static bool wdc_check_device_sn520(int fd)
+{
+	bool ret;
+	struct nvme_id_ctrl ctrl;
+	int device_id;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return false;
+	}
+
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return false;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
+			((device_id == WDC_NVME_SN520_DEV_ID_1) ||
+			(device_id == WDC_NVME_SN520_DEV_ID_2)))
+		ret = true;
+	else
+		ret = false;
+
+	return ret;
+}
+
+static bool wdc_check_device_sn720(int fd)
+{
+	bool ret;
+	struct nvme_id_ctrl ctrl;
+	int device_id;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return false;
+	}
+
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return false;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
+			(device_id == WDC_NVME_SN720_DEV_ID))
 		ret = true;
 	else
 		ret = false;
@@ -795,14 +936,36 @@ static __u32 wdc_dump_length_e6(int fd, __u32 opcode, __u32 cdw10, __u32 cdw12, 
 
 	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
 	if (ret != 0) {
-		ret = -1;
 		fprintf(stderr, "ERROR : WDC : reading dump length failed\n");
 		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
-		return ret;
 	}
 
 	return ret;
 }
+
+static __u32 wdc_dump_dui_data(int fd, __u32 dataLen, __u32 offset, __u8 *dump_data)
+{
+	int ret;
+	struct nvme_admin_cmd admin_cmd;
+
+	memset(&admin_cmd, 0, sizeof (struct nvme_admin_cmd));
+	admin_cmd.opcode = WDC_NVME_CAP_DUI_OPCODE;
+	admin_cmd.nsid = 0xffffffff;
+
+	admin_cmd.addr = (__u64)(uintptr_t)dump_data;
+	admin_cmd.data_len = dataLen;
+	admin_cmd.cdw10 = ((dataLen>>2)-1);
+	admin_cmd.cdw12 = offset;
+
+	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+	if (ret != 0) {
+		fprintf(stderr, "ERROR : WDC : reading DUI length failed\n");
+		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	}
+
+	return ret;
+}
+
 
 static int wdc_do_dump(int fd, __u32 opcode,__u32 data_len,
 		__u32 cdw12, char *file, __u32 xfer_size)
@@ -925,15 +1088,6 @@ static int wdc_do_cap_diag(int fd, char *file, __u32 xfer_size)
 	__u32 e6_log_hdr_size = WDC_NVME_CAP_DIAG_HEADER_TOC_SIZE;
 	struct wdc_e6_log_hdr *log_hdr;
 	__u32 cap_diag_length;
-	int verify_file;
-
-	/* verify the passed in file name and path is valid before getting the dump data */
-	verify_file = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-	if (verify_file < 0) {
-		fprintf(stderr, "ERROR : WDC: open : %s\n", strerror(errno));
-		return -1;
-	}
-	close(verify_file);
 
 	log_hdr = (struct wdc_e6_log_hdr *) malloc(e6_log_hdr_size);
 	if (log_hdr == NULL) {
@@ -964,13 +1118,99 @@ static int wdc_do_cap_diag(int fd, char *file, __u32 xfer_size)
 				(WDC_NVME_CAP_DIAG_SUBCMD << WDC_NVME_SUBCMD_SHIFT) | WDC_NVME_CAP_DIAG_CMD,
 				file, xfer_size, (__u8 *)log_hdr);
 
-		fprintf(stderr, "INFO : WDC : Capture Diagnostics log, length = 0x%x, ret = %d\n",
-				cap_diag_length, ret);
+		fprintf(stderr, "INFO : WDC : Capture Diagnostics log, length = 0x%x\n", cap_diag_length);
 	}
 
 	free(log_hdr);
 	return ret;
 }
+
+
+static int wdc_do_cap_dui(int fd, char *file, __u32 xfer_size)
+{
+	int ret = 0;
+	__u32 dui_log_hdr_size = WDC_NVME_CAP_DUI_HEADER_SIZE;
+	struct wdc_dui_log_hdr *log_hdr;
+	__u32 cap_dui_length;
+	__u8 *dump_data;
+	__u64 buffer_addr;
+	__u32 curr_data_offset;
+	__s32 log_size;
+	int i;
+
+	log_hdr = (struct wdc_dui_log_hdr *) malloc(dui_log_hdr_size);
+	if (log_hdr == NULL) {
+		fprintf(stderr, "%s: ERROR : malloc : %s\n", __func__, strerror(errno));
+		return -1;
+	}
+	memset(log_hdr, 0, dui_log_hdr_size);
+
+	/* get the dui telemetry and log headers  */
+	ret = wdc_dump_dui_data(fd,
+						WDC_NVME_CAP_DUI_HEADER_SIZE,
+						0x00,
+						(__u8 *)log_hdr);
+	if (ret != 0) {
+		free(log_hdr);
+		fprintf(stderr, "%s: ERROR : WDC : Get DUI headers failed\n", __func__);
+		fprintf(stderr, "%s: ERROR : WDC : NVMe Status:%s(%x)\n", __func__, nvme_status_to_string(ret), ret);
+
+		return ret;
+	}
+
+	cap_dui_length = (log_hdr->log_size[3] << 24 | log_hdr->log_size[2] << 16 |
+			log_hdr->log_size[1] << 8 | log_hdr->log_size[0]);
+
+	if (cap_dui_length == 0) {
+		fprintf(stderr, "INFO : WDC : Capture Device Unit Info log is empty\n");
+	} else {
+		if (xfer_size == 0)
+			xfer_size = cap_dui_length;
+
+		dump_data = (__u8 *) malloc(sizeof (__u8) * cap_dui_length);
+
+		if (dump_data == NULL) {
+			fprintf(stderr, "%s: ERROR : malloc : %s\n", __func__, strerror(errno));
+			return -1;
+		}
+		memset(dump_data, 0, sizeof (__u8) * cap_dui_length);
+
+		/* copy the telemetry and log headers into the dump_data buffer */
+		memcpy(dump_data, log_hdr, WDC_NVME_CAP_DUI_HEADER_SIZE);
+
+		curr_data_offset = WDC_NVME_CAP_DUI_HEADER_SIZE;
+		i = 0;
+
+		log_size = (cap_dui_length - WDC_NVME_CAP_DUI_HEADER_SIZE);
+		while (log_size > 0) {
+			xfer_size = min(xfer_size, log_size);
+
+			buffer_addr = (__u64)(uintptr_t)dump_data + (__u64)curr_data_offset;
+			ret = wdc_dump_dui_data(fd, xfer_size, curr_data_offset, (__u8 *)buffer_addr);
+			if (ret != 0) {
+				fprintf(stderr, "%s: ERROR : WDC : Get chunk %d, size = 0x%x, offset = 0x%x, addr = 0x%lx\n",
+						__func__, i, cap_dui_length, curr_data_offset, (long unsigned int)buffer_addr);
+				fprintf(stderr, "%s: ERROR : WDC : NVMe Status:%s(%x)\n", __func__, nvme_status_to_string(ret), ret);
+				break;
+			}
+
+			log_size         -= xfer_size;
+			curr_data_offset += xfer_size;
+			i++;
+		}
+
+		if (ret == 0) {
+			fprintf(stderr, "%s:  NVMe Status:%s(%x)\n", __func__, nvme_status_to_string(ret), ret);
+			fprintf(stderr, "INFO : WDC : Capture Device Unit Info log, length = 0x%x\n", cap_dui_length);
+
+			ret = wdc_create_log_file(file, dump_data, cap_dui_length);
+		}
+		free(dump_data);
+	}
+
+	return ret;
+}
+
 
 static int wdc_cap_diag(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
@@ -1029,6 +1269,7 @@ static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
        int fd;
        UtilsTimeInfo             timeInfo;
        __u8                      timeStamp[MAX_PATH_LEN];
+		int verify_file;
 
        struct config {
     	   char *file;
@@ -1051,27 +1292,47 @@ static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
        if (fd < 0)
     	   return fd;
 
-       wdc_check_device(fd);
-       if (cfg.xfer_size != 0) {
-    	   	   xfer_size = cfg.xfer_size;
-       }
-       if (cfg.file != NULL) {
-    	   strncpy(f, cfg.file, PATH_MAX - 1);
-       } else {
-    		wdc_UtilsGetTime(&timeInfo);
-    		memset(timeStamp, 0, sizeof(timeStamp));
-    		wdc_UtilsSnprintf((char*)timeStamp, MAX_PATH_LEN, "%02u%02u%02u_%02u%02u%02u",
-    				timeInfo.year, timeInfo.month, timeInfo.dayOfMonth,
-    				timeInfo.hour, timeInfo.minute, timeInfo.second);
-    		snprintf(fileSuffix, PATH_MAX, "_internal_fw_log_%s", (char*)timeStamp);
+	   if (cfg.xfer_size != 0) {
+		   xfer_size = cfg.xfer_size;
+	   }
 
-    	   if (wdc_get_serial_name(fd, f, PATH_MAX, fileSuffix) == -1) {
-    		   fprintf(stderr, "ERROR : WDC: failed to generate file name\n");
-    		   return -1;
-    	   }
-       }
+	   if (cfg.file != NULL) {
+		   strncpy(f, cfg.file, PATH_MAX - 1);
+	   } else {
+		   wdc_UtilsGetTime(&timeInfo);
+		   memset(timeStamp, 0, sizeof(timeStamp));
+		   wdc_UtilsSnprintf((char*)timeStamp, MAX_PATH_LEN, "%02u%02u%02u_%02u%02u%02u",
+				   timeInfo.year, timeInfo.month, timeInfo.dayOfMonth,
+				   timeInfo.hour, timeInfo.minute, timeInfo.second);
+		   snprintf(fileSuffix, PATH_MAX, "_internal_fw_log_%s", (char*)timeStamp);
+
+		   if (wdc_get_serial_name(fd, f, PATH_MAX, fileSuffix) == -1) {
+			   fprintf(stderr, "ERROR : WDC: failed to generate file name\n");
+			   return -1;
+		   }
+
+		   /* verify the passed in file name and path is valid before getting the dump data */
+		   verify_file = open(f, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+		   if (verify_file < 0) {
+			   fprintf(stderr, "ERROR : WDC: verify file open : %s\n", strerror(errno));
+			   return -1;
+		   }
+		   close(verify_file);
+	   }
 	   fprintf(stderr, "%s: filename = %s\n", __func__, f);
-       return wdc_do_cap_diag(fd, f, xfer_size);
+
+       if (wdc_check_device_sn100(fd) ||
+    		   wdc_check_device_sn200(fd) ||
+			   wdc_check_device_sn310(fd)) {
+    	   return wdc_do_cap_diag(fd, f, xfer_size);
+       } else if (wdc_check_device_sn520(fd) ||
+    		   wdc_check_device_sn720(fd)) {
+			return wdc_do_cap_dui(fd, f, xfer_size);
+
+       } else {
+		   fprintf(stderr, "ERROR : WDC: unsupported device for internal_fw_log command\n");
+		   return -1;
+       }
 }
 
 static int wdc_do_crash_dump(int fd, char *file, int type)

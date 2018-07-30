@@ -148,5 +148,6 @@ extern const char *devicename;
 
 int __id_ctrl(int argc, char **argv, struct command *cmd, struct plugin *plugin, void (*vs)(__u8 *vs, struct json_object *root));
 int	validate_output_format(char *format);
+char *nvme_char_from_block(char *block);
 
 #endif /* _NVME_H */
