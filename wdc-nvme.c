@@ -57,6 +57,7 @@
 #define WDC_NVME_SN200_DEV_ID			0x0023
 #define WDC_NVME_VID_2        			0x1b96
 #define WDC_NVME_SN310_DEV_ID			0x2200
+#define WDC_NVME_SN510_DEV_ID			0x2300
 #define WDC_NVME_SNDK_VID		        0x15b7
 #define WDC_NVME_SXSLCL_DEV_ID  		0x2001
 #define WDC_NVME_SN520_DEV_ID_1  		0x5003
@@ -550,7 +551,8 @@ static bool wdc_check_device(int fd)
 			(device_id == WDC_NVME_SXSLCL_DEV_ID))
 		supported = true;
 	else if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
-			(device_id == WDC_NVME_SN310_DEV_ID))
+			((device_id == WDC_NVME_SN310_DEV_ID) ||
+			 (device_id == WDC_NVME_SN510_DEV_ID)))
 		supported = true;
 	else
 		fprintf(stderr, "WARNING : WDC not supported, Vendor ID = 0x%x, Device ID = 0x%x\n", le32_to_cpu(ctrl.vid), device_id);
@@ -587,7 +589,7 @@ static int wdc_check_device_sxslcl(int fd)
 
 static bool wdc_check_device_sn100(int fd)
 {
-	bool ret;
+	int ret;
 	struct nvme_id_ctrl ctrl;
 	int device_id;
 
@@ -606,16 +608,14 @@ static bool wdc_check_device_sn100(int fd)
 	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
 			(device_id == WDC_NVME_SN100_DEV_ID))
-		ret = true;
+		return true;
 	else
-		ret = false;
-
-	return ret;
+		return false;
 }
 
 static bool wdc_check_device_sn200(int fd)
 {
-	bool ret;
+	int ret;
 	struct nvme_id_ctrl ctrl;
 	int device_id;
 
@@ -634,16 +634,14 @@ static bool wdc_check_device_sn200(int fd)
 	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID) &&
 			(device_id == WDC_NVME_SN200_DEV_ID))
-		ret = true;
+		return true;
 	else
-		ret = false;
-
-	return ret;
+		return false;
 }
 
 static bool wdc_check_device_sn310(int fd)
 {
-	bool ret;
+	int ret;
 	struct nvme_id_ctrl ctrl;
 	int device_id;
 
@@ -662,16 +660,40 @@ static bool wdc_check_device_sn310(int fd)
 	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
 			(device_id == WDC_NVME_SN310_DEV_ID))
-		ret = true;
+		return true;
 	else
-		ret = false;
+		return false;
+}
 
-	return ret;
+static bool wdc_check_device_sn510(int fd)
+{
+	int ret;
+	struct nvme_id_ctrl ctrl;
+	int device_id;
+
+	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
+	ret = nvme_identify_ctrl(fd, &ctrl);
+	if (ret) {
+		fprintf(stderr, "ERROR : WDC : nvme_identify_ctrl() failed "
+				"0x%x\n", ret);
+		return false;
+	}
+
+	ret = wdc_get_pci_dev_id((int *)&device_id);
+	if (ret < 0)
+		return false;
+
+	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
+	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_VID_2) &&
+			(device_id == WDC_NVME_SN510_DEV_ID))
+		return true;
+	else
+		return false;
 }
 
 static bool wdc_check_device_sn520(int fd)
 {
-	bool ret;
+	int ret;
 	struct nvme_id_ctrl ctrl;
 	int device_id;
 
@@ -691,16 +713,14 @@ static bool wdc_check_device_sn520(int fd)
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
 			((device_id == WDC_NVME_SN520_DEV_ID_1) ||
 			(device_id == WDC_NVME_SN520_DEV_ID_2)))
-		ret = true;
+		return true;
 	else
-		ret = false;
-
-	return ret;
+		return false;
 }
 
 static bool wdc_check_device_sn720(int fd)
 {
-	bool ret;
+	int ret;
 	struct nvme_id_ctrl ctrl;
 	int device_id;
 
@@ -719,11 +739,9 @@ static bool wdc_check_device_sn720(int fd)
 	/* WDC : Use PCI Vendor and Device ID's to identify WDC Devices */
 	if ((le32_to_cpu(ctrl.vid) == WDC_NVME_SNDK_VID) &&
 			(device_id == WDC_NVME_SN720_DEV_ID))
-		ret = true;
+		return true;
 	else
-		ret = false;
-
-	return ret;
+		return false;
 }
 
 static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix)
@@ -1217,26 +1235,26 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 {
 	char *desc = "Capture Diagnostics Log.";
 	char *file = "Output file pathname.";
-    char *size = "Data retrieval transfer size.";
+	char *size = "Data retrieval transfer size.";
 	char f[PATH_MAX] = {0};
 	__u32 xfer_size = 0;
 	int fd;
 
 	struct config {
 		char *file;
-        __u32 xfer_size;
+		__u32 xfer_size;
 	};
 
 	struct config cfg = {
-		.file = NULL,
-		.xfer_size = 0x10000
+			.file = NULL,
+			.xfer_size = 0x10000
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
-		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
-        {"transfer-size", 's', "NUM", CFG_POSITIVE, &cfg.xfer_size, required_argument, size},
-		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
-		{NULL}
+			{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
+			{"transfer-size", 's', "NUM", CFG_POSITIVE, &cfg.xfer_size, required_argument, size},
+			{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+			{NULL}
 	};
 
 	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
@@ -1247,9 +1265,9 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 	if (cfg.file != NULL) {
 		strncpy(f, cfg.file, PATH_MAX - 1);
 	}
-    if (cfg.xfer_size != 0) {
- 	   	   xfer_size = cfg.xfer_size;
-    }
+	if (cfg.xfer_size != 0) {
+		xfer_size = cfg.xfer_size;
+	}
 	if (wdc_get_serial_name(fd, f, PATH_MAX, "cap_diag") == -1) {
 		fprintf(stderr, "ERROR : WDC: failed to generate file name\n");
 		return -1;
@@ -1260,79 +1278,79 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
                struct plugin *plugin)
 {
-       char *desc = "Internal Firmware Log.";
-       char *file = "Output file pathname.";
-       char *size = "Data retrieval transfer size.";
-       char f[PATH_MAX] = {0};
-       char fileSuffix[PATH_MAX] = {0};
-       __u32 xfer_size = 0;
-       int fd;
-       UtilsTimeInfo             timeInfo;
-       __u8                      timeStamp[MAX_PATH_LEN];
-		int verify_file;
+	char *desc = "Internal Firmware Log.";
+	char *file = "Output file pathname.";
+	char *size = "Data retrieval transfer size.";
+	char f[PATH_MAX] = {0};
+	char fileSuffix[PATH_MAX] = {0};
+	__u32 xfer_size = 0;
+	int fd;
+	UtilsTimeInfo             timeInfo;
+	__u8                      timeStamp[MAX_PATH_LEN];
+	int verify_file;
 
-       struct config {
-    	   char *file;
-    	   __u32 xfer_size;
-       };
+	struct config {
+		char *file;
+		__u32 xfer_size;
+	};
 
-       struct config cfg = {
-		   .file = NULL,
-		   .xfer_size = 0x10000
-       };
+	struct config cfg = {
+		.file = NULL,
+		.xfer_size = 0x10000
+	};
 
-       const struct argconfig_commandline_options command_line_options[] = {
-               {"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
-               {"transfer-size", 's', "NUM", CFG_POSITIVE, &cfg.xfer_size, required_argument, size},
-               { NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
-               {NULL}
-       };
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"output-file", 'o', "FILE", CFG_STRING, &cfg.file, required_argument, file},
+		{"transfer-size", 's', "NUM", CFG_POSITIVE, &cfg.xfer_size, required_argument, size},
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc},
+		{NULL}
+	};
 
-       fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-       if (fd < 0)
-    	   return fd;
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+        
+	if (cfg.xfer_size != 0) {
+		xfer_size = cfg.xfer_size;
+	}
 
-	   if (cfg.xfer_size != 0) {
-		   xfer_size = cfg.xfer_size;
-	   }
+	if (cfg.file != NULL) {
+		strncpy(f, cfg.file, PATH_MAX - 1);
+	} else {
+		wdc_UtilsGetTime(&timeInfo);
+		memset(timeStamp, 0, sizeof(timeStamp));
+		wdc_UtilsSnprintf((char*)timeStamp, MAX_PATH_LEN, "%02u%02u%02u_%02u%02u%02u",
+			timeInfo.year, timeInfo.month, timeInfo.dayOfMonth,
+			timeInfo.hour, timeInfo.minute, timeInfo.second);
+		snprintf(fileSuffix, PATH_MAX, "_internal_fw_log_%s", (char*)timeStamp);
 
-	   if (cfg.file != NULL) {
-		   strncpy(f, cfg.file, PATH_MAX - 1);
-	   } else {
-		   wdc_UtilsGetTime(&timeInfo);
-		   memset(timeStamp, 0, sizeof(timeStamp));
-		   wdc_UtilsSnprintf((char*)timeStamp, MAX_PATH_LEN, "%02u%02u%02u_%02u%02u%02u",
-				   timeInfo.year, timeInfo.month, timeInfo.dayOfMonth,
-				   timeInfo.hour, timeInfo.minute, timeInfo.second);
-		   snprintf(fileSuffix, PATH_MAX, "_internal_fw_log_%s", (char*)timeStamp);
+		if (wdc_get_serial_name(fd, f, PATH_MAX, fileSuffix) == -1) {
+			fprintf(stderr, "ERROR : WDC: failed to generate file name\n");
+			return -1;
+		}
 
-		   if (wdc_get_serial_name(fd, f, PATH_MAX, fileSuffix) == -1) {
-			   fprintf(stderr, "ERROR : WDC: failed to generate file name\n");
-			   return -1;
-		   }
+		/* verify the passed in file name and path is valid before getting the dump data */
+		verify_file = open(f, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+		if (verify_file < 0) {
+			fprintf(stderr, "ERROR : WDC: verify file open : %s\n", strerror(errno));
+			return -1;
+		}
+		close(verify_file);
+	}
+	fprintf(stderr, "%s: filename = %s\n", __func__, f);
 
-		   /* verify the passed in file name and path is valid before getting the dump data */
-		   verify_file = open(f, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-		   if (verify_file < 0) {
-			   fprintf(stderr, "ERROR : WDC: verify file open : %s\n", strerror(errno));
-			   return -1;
-		   }
-		   close(verify_file);
-	   }
-	   fprintf(stderr, "%s: filename = %s\n", __func__, f);
-
-       if (wdc_check_device_sn100(fd) ||
-    		   wdc_check_device_sn200(fd) ||
-			   wdc_check_device_sn310(fd)) {
-    	   return wdc_do_cap_diag(fd, f, xfer_size);
-       } else if (wdc_check_device_sn520(fd) ||
-    		   wdc_check_device_sn720(fd)) {
-			return wdc_do_cap_dui(fd, f, xfer_size);
-
-       } else {
-		   fprintf(stderr, "ERROR : WDC: unsupported device for internal_fw_log command\n");
-		   return -1;
-       }
+	if (wdc_check_device_sn100(fd) ||
+		wdc_check_device_sn200(fd) ||
+		wdc_check_device_sn310(fd) ||
+		wdc_check_device_sn510(fd)) {
+		return wdc_do_cap_diag(fd, f, xfer_size);
+	} else if (wdc_check_device_sn520(fd) ||
+		wdc_check_device_sn720(fd)) {
+		return wdc_do_cap_dui(fd, f, xfer_size);
+	} else {
+		fprintf(stderr, "ERROR : WDC: unsupported device for internal_fw_log command\n");
+		return -1;
+	}
 }
 
 static int wdc_do_crash_dump(int fd, char *file, int type)
@@ -2388,7 +2406,8 @@ static int wdc_smart_add_log_d0(int argc, char **argv, struct command *command,
 		return fd;
 
 
-	if (wdc_check_device_sn310(fd)) {
+	if (wdc_check_device_sn310(fd) ||
+		wdc_check_device_sn510(fd)) {
 		// Get the D0 Log Page
 		ret = wdc_get_d0_log_page(fd, cfg.output_format);
 
