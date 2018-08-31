@@ -1,13 +1,13 @@
 '\" t
-.\"     Title: nvme-wdc-vs-smart-add-log
+.\"     Title: nvme-wdc-smart-add-log
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 08/07/2017
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 08/31/2018
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-VS\-SMART" "1" "08/07/2017" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-SMART\-AD" "1" "08/31/2018" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,15 +28,15 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-nvme-wdc-vs-smart-add-log \- Send NVMe WDC vs\-smart\-add\-log Vendor Unique Command, return result
+nvme-wdc-smart-add-log \- Send NVMe WDC smart\-add\-log Vendor Unique Command, return result
 .SH "SYNOPSIS"
 .sp
 .nf
-\fInvme wdc vs\-smart\-add\-log\fR <device> [\-\-output\-format=<normal|json> \-o <normal|json>]
+\fInvme wdc smart\-add\-log\fR <device> [\-\-output\-format=<normal|json> \-o <normal|json>]
 .fi
 .SH "DESCRIPTION"
 .sp
-For the NVMe device given, send a Vendor Unique WDC vs\-smart\-add\-log command and provide the additional smart CA log\&.
+For the NVMe device given, send a Vendor Unique WDC smart\-add\-log command and provide the additional smart CA log\&.
 .sp
 The <device> parameter is mandatory and may be either the NVMe character device (ex: /dev/nvme0)\&.
 .sp
@@ -209,13 +209,13 @@ T}
 .sp -1
 .IP \(bu 2.3
 .\}
-Has the program issue WDC vs\-smart\-add\-log Vendor Unique Command :
+Has the program issue WDC smart\-add\-log Vendor Unique Command :
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-# nvme wdc vs\-smart\-add\-log /dev/nvme0
+# nvme wdc smart\-add\-log /dev/nvme0
 .fi
 .if n \{\
 .RE
