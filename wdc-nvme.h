@@ -21,6 +21,7 @@ PLUGIN(NAME("wdc", "Western Digital vendor specific extensions"),
 		ENTRY("smart-add-log-d0", "WDC Additional Smart Log for D0 Log page", wdc_smart_add_log_d0)
 		ENTRY("clear-pcie-corr", "WDC Clear PCIe Correctable Error Count", wdc_clear_pcie_corr)
 		ENTRY("drive-essentials", "WDC Drive Essentials", wdc_drive_essentials)
+		ENTRY("get-drive-status", "WDC Get Drive Status", wdc_drive_status)
 	)
 );
 

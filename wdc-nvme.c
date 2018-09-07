@@ -150,6 +150,10 @@
 #define WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE			0xCA
 #define WDC_CA_LOG_BUF_LEN							0x80
 
+/* C0 EOL Status Log Page */
+#define WDC_NVME_GET_EOL_STATUS_LOG_OPCODE			0xC0
+#define WDC_NVME_EOL_STATUS_LOG_LEN       			0x200
+
 /* D0 Smart Log Page */
 #define WDC_NVME_GET_VU_SMART_LOG_OPCODE			0xD0
 #define WDC_NVME_VU_SMART_LOG_LEN       			0x200
@@ -334,6 +338,8 @@ static int wdc_clear_pcie_corr(int argc, char **argv, struct command *command,
 static int wdc_do_drive_essentials(int fd, char *dir, char *key);
 static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
+static int wdc_drive_status(int argc, char **argv, struct command *command,
+		struct plugin *plugin);
 
 /* Drive log data size */
 struct wdc_log_size {
@@ -467,6 +473,20 @@ struct __attribute__((__packed__)) wdc_ssd_d0_smart_log {
     __le32  lifetime_clean_shutdown_count;        /* 0x60 - Lifetime clean shutdown count on power loss */
     __le32  lifetime_unclean_shutdown_count;      /* 0x64 - Lifetime unclean shutdowns on power loss    */
     __u8    rsvd_104[0x198];                      /* 0x68-0x1FF Reserved                                */
+};
+
+struct __attribute__((__packed__)) wdc_ssd_c0_eol_log {
+	__u8    rsvd1[0x4c];                  /* 0x00-0x4B Reserved                     */
+	__le32  realloc_block_count;          /* 0x4C - Realloc Block Count             */
+	__le32  ecc_rate;                     /* 0x50 - ECC Rate                        */
+	__le32  write_amp;                    /* 0x54 - Write Amplification             */
+	__le32  percent_life_remaining;       /* 0x58 - Percent Life Remaining          */
+	__le32  unused_reserved_block_count;  /* 0x5C - Unused Reserved Block Count     */
+	__le32  program_fail_count;           /* 0x60 - Program Fail Count              */
+	__le32  erase_fail_count;             /* 0x64 - Erase Fail Count                */
+	__le32  rsvd2;                        /* 0x68 - Reserved                        */
+	__le32  raw_read_error_rate;          /* 0x6C - Raw Read Error Rate             */
+	__u8    rsvd3[0x190];                 /* 0x70-0x1FF Reserved                    */
 };
 
 static double safe_div_fp(double numerator, double denominator)
@@ -843,21 +863,26 @@ static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
 	/* get the log page length */
 	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_AVAILABLE_LOG_PAGES_OPCODE, WDC_C2_LOG_BUF_LEN, data);
 	if (ret) {
-		fprintf(stderr, "ERROR : WDC : Unable to get C2 Log Page length, ret = %d\n", ret);
+		fprintf(stderr, "ERROR : WDC : Unable to get C2 Log Page length, ret = 0x%x\n", ret);
 		goto out;
 	}
 
 	hdr_ptr = (struct wdc_c2_log_page_header *)data;
 
 	if (hdr_ptr->length > WDC_C2_LOG_BUF_LEN) {
-		fprintf(stderr, "ERROR : WDC : data length > buffer size : 0x%x\n", hdr_ptr->length);
-		goto out;
+		/* Log Page buffer too small, free and reallocate the necessary size */
+		free(data);
+		if ((data = (__u8*) malloc(sizeof (__u8) * hdr_ptr->length)) == NULL) {
+			fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
+			return ret;
+		}
+		memset(data, 0, sizeof (__u8) * hdr_ptr->length);
 	}
 
 	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_AVAILABLE_LOG_PAGES_OPCODE, hdr_ptr->length, data);
 	/* parse the data until the List of log page ID's is found */
 	if (ret) {
-		fprintf(stderr, "ERROR : WDC : Unable to read C2 Log Page data, ret = %d\n", ret);
+		fprintf(stderr, "ERROR : WDC : Unable to read C2 Log Page data, ret = 0x%x\n", ret);
 		goto out;
 	}
 
@@ -2057,6 +2082,29 @@ static void wdc_print_d0_log_json(struct wdc_ssd_d0_smart_log *perf)
 	json_free_object(root);
 }
 
+#if 0  /* Don't use the 0xC0 log page until updated EOL status is added */
+static void wdc_print_drive_status_c0(struct wdc_ssd_c0_eol_log *log_data)
+{
+	printf("  Drive Status Data : \n");
+	printf("  Realloc Block Count                          %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(log_data->realloc_block_count));
+	printf("  ECC Rate                                     %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(log_data->ecc_rate));
+	printf("  Write Amplification                          %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(log_data->write_amp));
+	printf("  Percent Life Remaining                       %20"PRIu32"%%\n",
+			(uint32_t)le32_to_cpu(log_data->percent_life_remaining));
+	printf("  Unused Reserved Block Count                  %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(log_data->unused_reserved_block_count));
+	printf("  Program Fail Count                           %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(log_data->program_fail_count));
+	printf("  Erase Fail Count                             %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(log_data->erase_fail_count));
+	printf("  Raw Read Error Rate                          %20"PRIu32"\n",
+			(uint32_t)le32_to_cpu(log_data->raw_read_error_rate));
+}
+#endif
+
 static int wdc_print_ca_log(struct wdc_ssd_ca_perf_stats *perf, int fmt)
 {
 	if (!perf) {
@@ -2090,6 +2138,32 @@ static int wdc_print_d0_log(struct wdc_ssd_d0_smart_log *perf, int fmt)
 	}
 	return 0;
 }
+
+static int wdc_print_drive_status(struct nvme_smart_log *log_data)
+{
+	uint32_t		percent_remaining;
+
+	if (!log_data) {
+		fprintf(stderr, "ERROR : WDC : Invalid buffer to read Smart Log Data\n");
+		return -1;
+	}
+
+	percent_remaining = le32_to_cpu(100 - log_data->percent_used);
+
+	printf("  Drive Status Data \n");
+	printf("  Percent Life Remaining:  %20"PRIu32"%%\n",
+			percent_remaining);
+
+	if (log_data->critical_warning & NVME_SMART_CRIT_MEDIA)
+		printf("  EOL Status = READ ONLY \n");
+	else if (percent_remaining == 0)
+		printf("  EOL Status = END OF LIFE \n");
+	else
+		printf("  EOL Status = NORMAL \n");
+
+	return 0;
+}
+
 
 static int wdc_smart_add_log_c1(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
@@ -2448,6 +2522,85 @@ static int wdc_clear_pcie_corr(int argc, char **argv, struct command *command,
 
 	ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+	return ret;
+}
+
+static int wdc_drive_status(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	char *desc = "Get Drive Status.";
+	//struct wdc_ssd_c0_eol_log *log_page;
+	struct nvme_smart_log *log_page;
+	int log_page_length;
+	__u8 *data;
+	int fd;
+	int ret = -1;
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
+	if (wdc_check_device_sn310(fd) ||
+		wdc_check_device_sn510(fd)) {
+#if 0 	/* Don't use the 0xC0 log page until updated EOL status is added */
+		/* verify the 0xC0 log page is supported */
+		log_page_length = sizeof(__u8) * WDC_NVME_EOL_STATUS_LOG_LEN);
+		 if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_EOL_STATUS_LOG_OPCODE)) {
+		 	fprintf(stderr, "ERROR : WDC : 0xC0 Log Page not supported\n");
+			return -1;
+		}
+
+		if ((data = (__u8 *) malloc(log_page_length)) == NULL) {
+			fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
+			return -1;
+		}
+		memset(data, 0, log_page_length);
+
+		ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_EOL_STATUS_LOG_OPCODE,
+				log_page_length, data);
+#endif
+
+		/* verify the 0x02 smart log page is supported */
+		log_page_length = sizeof(struct nvme_smart_log);
+		if (wdc_nvme_check_supported_log_page(fd, NVME_LOG_SMART)) {
+			fprintf(stderr, "ERROR : WDC : 0x%x Log Page not supported\n", NVME_LOG_SMART);
+			return -1;
+		}
+
+		if ((data = (__u8 *) malloc(log_page_length)) == NULL) {
+			fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
+			return -1;
+		}
+		memset(data, 0, log_page_length);
+
+
+		ret = nvme_get_log(fd, 0xFFFFFFFF, NVME_LOG_SMART,
+				log_page_length, data);
+
+		if (ret == 0) {
+			/* parse the data */
+#if 0 	/* Don't use the 0xC0 log page until updated EOL status is added */
+			log_page = (struct wdc_ssd_c0_eol_log *)(data);
+			ret = wdc_print_drive_status(log_page);
+#endif
+			log_page = (struct nvme_smart_log *)(data);
+			ret = wdc_print_drive_status(log_page);
+		} else {
+			fprintf(stderr, "ERROR : WDC : Unable to read 0x%x Log Page data\n", NVME_LOG_SMART);
+			ret = -1;
+		}
+
+		free(data);
+	}
+	else {
+		fprintf(stderr, "INFO : WDC : Command not supported in this device\n");
+	}
+
 	return ret;
 }
 
