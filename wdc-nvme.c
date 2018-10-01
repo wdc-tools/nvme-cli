@@ -114,6 +114,11 @@
 #define WDC_NVME_CLEAR_PCIE_CORR_CMD		0x22
 #define WDC_NVME_CLEAR_PCIE_CORR_SUBCMD		0x04
 
+/* Clear Assert Dump Status */
+#define WDC_NVME_CLEAR_ASSERT_DUMP_OPCODE  	0xD8
+#define WDC_NVME_CLEAR_ASSERT_DUMP_CMD		0x03
+#define WDC_NVME_CLEAR_ASSERT_DUMP_SUBCMD	0x05
+
 /* Purge and Purge Monitor */
 #define WDC_NVME_PURGE_CMD_OPCODE			0xDD
 #define WDC_NVME_PURGE_MONITOR_OPCODE		0xDE
@@ -142,9 +147,16 @@
 #define WDC_NVME_GET_STAT_PERF_INTERVAL_LIFETIME	0x0F
 
 /* C2 Log Page */
-#define WDC_NVME_GET_AVAILABLE_LOG_PAGES_OPCODE		0xC2
+#define WDC_NVME_GET_DEV_MGMNT_LOG_PAGE_OPCODE		0xC2
 #define WDC_C2_LOG_BUF_LEN							0x1000
 #define WDC_C2_LOG_PAGES_SUPPORTED_ID				0x08
+#define WDC_C2_THERMAL_THROTTLE_STATUS_ID			0x18
+#define WDC_C2_ASSERT_DUMP_PRESENT_ID				0x19
+#define ASSERT_DUMP_NOT_PRESENT      				0x00000000
+#define ASSERT_DUMP_PRESENT             			0x00000001
+#define THERMAL_THROTTLING_OFF        				0x00000000
+#define THERMAL_THROTTLING_ON           			0x00000001
+#define THERMAL_THROTTLING_UNAVAILABLE				0x00000002
 
 /* CA Log Page */
 #define WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE			0xCA
@@ -332,13 +344,15 @@ static int wdc_purge(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
 static int wdc_purge_monitor(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
-static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id);
+static bool wdc_nvme_check_supported_log_page(int fd, __u8 log_id);
 static int wdc_clear_pcie_corr(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 static int wdc_do_drive_essentials(int fd, char *dir, char *key);
 static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 static int wdc_drive_status(int argc, char **argv, struct command *command,
+		struct plugin *plugin);
+static int wdc_clear_assert_dump(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
 
 /* Drive log data size */
@@ -703,28 +717,28 @@ static int wdc_create_log_file(char *file, __u8 *drive_log_data,
 	return 0;
 }
 
-static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
+static bool get_dev_mgment_cbs_data(int fd, __u8 log_id, void **cbs_data)
 {
-	int i;
 	int ret = -1;
-	int found = 0;
 	__u8* data;
-	__u32 length = 0;
-	struct wdc_c2_cbs_data *cbs_data;
 	struct wdc_c2_log_page_header *hdr_ptr;
 	struct wdc_c2_log_subpage_header *sph;
+	__u32 length = 0;
+	bool found = false;
+
+	*cbs_data = NULL;
 
 	if ((data = (__u8*) malloc(sizeof (__u8) * WDC_C2_LOG_BUF_LEN)) == NULL) {
 		fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
-		return ret;
+		return false;
 	}
 	memset(data, 0, sizeof (__u8) * WDC_C2_LOG_BUF_LEN);
 
 	/* get the log page length */
-	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_AVAILABLE_LOG_PAGES_OPCODE, WDC_C2_LOG_BUF_LEN, data);
+	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_DEV_MGMNT_LOG_PAGE_OPCODE, WDC_C2_LOG_BUF_LEN, data);
 	if (ret) {
 		fprintf(stderr, "ERROR : WDC : Unable to get C2 Log Page length, ret = 0x%x\n", ret);
-		goto out;
+		goto end;
 	}
 
 	hdr_ptr = (struct wdc_c2_log_page_header *)data;
@@ -734,29 +748,50 @@ static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
 		free(data);
 		if ((data = (__u8*) malloc(sizeof (__u8) * hdr_ptr->length)) == NULL) {
 			fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
-			return ret;
+			return false;
 		}
 		memset(data, 0, sizeof (__u8) * hdr_ptr->length);
 	}
 
-	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_AVAILABLE_LOG_PAGES_OPCODE, hdr_ptr->length, data);
+	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_DEV_MGMNT_LOG_PAGE_OPCODE, hdr_ptr->length, data);
 	/* parse the data until the List of log page ID's is found */
 	if (ret) {
 		fprintf(stderr, "ERROR : WDC : Unable to read C2 Log Page data, ret = 0x%x\n", ret);
-		goto out;
+		goto end;
 	}
 
 	length = sizeof(struct wdc_c2_log_page_header);
+	hdr_ptr = (struct wdc_c2_log_page_header *)data;
+
 	while (length < hdr_ptr->length) {
 		sph = (struct wdc_c2_log_subpage_header *)(data + length);
 
-		if (sph->entry_id == WDC_C2_LOG_PAGES_SUPPORTED_ID) {
-			cbs_data = (struct wdc_c2_cbs_data *)&sph->data;
+		if (sph->entry_id == log_id) {
+			*cbs_data = (void *)&sph->data;
+			found = true;
+			break;
+		}
+		length += le32_to_cpu(sph->length);
+	}
 
+end:
+	free(data);
+	return found;
+}
+
+static bool wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
+{
+	int i;
+	bool found = false;
+	struct wdc_c2_cbs_data *cbs_data = NULL;
+
+	if (get_dev_mgment_cbs_data(fd, WDC_C2_LOG_PAGES_SUPPORTED_ID, (void *)&cbs_data))
+	{
+		if (cbs_data != NULL)
+		{
 			for (i = 0; i < cbs_data->length; i++) {
 				if (log_id == cbs_data->data[i]) {
-					found = 1;
-					ret = 0;
+					found = true;
 					break;
 				}
 			}
@@ -765,16 +800,50 @@ static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
 				fprintf(stderr, "ERROR : WDC : Log Page 0x%x not supported\n", log_id);
 				fprintf(stderr, "WDC : Supported Log Pages:\n");
 				/* print the supported pages */
-				d((__u8 *)&sph->data + 4, sph->length - 12, 16, 1);
-				ret = -1;
+				d((__u8 *)cbs_data->data, cbs_data->length, 16, 1);
 			}
-			break;
+		} else {
+			fprintf(stderr, "ERROR : WDC : cbs_data ptr = NULL\n");
 		}
-		length += le32_to_cpu(sph->length);
+	} else {
+		fprintf(stderr, "ERROR : WDC : Entry ID 0x%x not found\n", WDC_C2_LOG_PAGES_SUPPORTED_ID);
 	}
-out:
-	free(data);
-	return ret;
+
+	return found;
+}
+
+static bool wdc_nvme_get_thermal_throttling_status(int fd, __u32 *thermal_status)
+{
+	__u32 *cbs_data = NULL;
+	bool found = false;
+
+	if (get_dev_mgment_cbs_data(fd, WDC_C2_THERMAL_THROTTLE_STATUS_ID, (void *)&cbs_data))
+	{
+		if (cbs_data != NULL)
+		{
+			memcpy((void *)thermal_status, (void *)cbs_data, 4);
+			found = true;
+		}
+	}
+
+	return found;
+}
+
+static bool wdc_nvme_get_assert_status(int fd, __u32 *assert_status)
+{
+	__u32 *cbs_data = NULL;
+	bool found = false;
+
+	if (get_dev_mgment_cbs_data(fd, WDC_C2_ASSERT_DUMP_PRESENT_ID, (void *)&cbs_data))
+	{
+		if (cbs_data != NULL)
+		{
+			memcpy((void *)assert_status, (void *)cbs_data, 4);
+			found = true;
+		}
+	}
+
+	return found;
 }
 
 static int wdc_do_clear_dump(int fd, __u8 opcode, __u32 cdw12)
@@ -2009,114 +2078,6 @@ static int wdc_print_d0_log(struct wdc_ssd_d0_smart_log *perf, int fmt)
 	return 0;
 }
 
-static int wdc_print_drive_status(struct nvme_smart_log *log_data)
-{
-	uint32_t		percent_remaining;
-
-	if (!log_data) {
-		fprintf(stderr, "ERROR : WDC : Invalid buffer to read Smart Log Data\n");
-		return -1;
-	}
-
-	percent_remaining = le32_to_cpu(100 - log_data->percent_used);
-
-	printf("  Drive Status Data \n");
-	printf("  Percent Life Remaining:  %20"PRIu32"%%\n",
-			percent_remaining);
-
-	if (log_data->critical_warning & NVME_SMART_CRIT_MEDIA)
-		printf("  EOL Status = READ ONLY \n");
-	else if (percent_remaining == 0)
-		printf("  EOL Status = END OF LIFE \n");
-	else
-		printf("  EOL Status = NORMAL \n");
-
-	return 0;
-}
-
-
-static int wdc_smart_add_log_c1(int argc, char **argv, struct command *command,
-		struct plugin *plugin)
-{
-	char *desc = "Retrieve additional performance statistics.";
-	char *interval = "Interval to read the statistics from [1, 15].";
-	__u8 *p;
-	__u8 *data;
-	int i;
-	int fd;
-	int ret;
-	int fmt = -1;
-	int skip_cnt = 4;
-	int total_subpages;
-	struct wdc_log_page_header *l;
-	struct wdc_log_page_subpage_header *sph;
-	struct wdc_ssd_perf_stats *perf;
-
-	struct config {
-		uint8_t interval;
-		int vendor_specific;
-		char *output_format;
-	};
-
-	struct config cfg = {
-		.interval = 14,
-		.output_format = "normal",
-	};
-
-	const struct argconfig_commandline_options command_line_options[] = {
-		{"interval", 'i', "NUM", CFG_POSITIVE, &cfg.interval, required_argument, interval},
-		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format, required_argument, "Output Format: normal|json" },
-		{NULL}
-	};
-
-	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
-	if (fd < 0)
-		return fd;
-
-	wdc_check_device(fd);
-	fmt = validate_output_format(cfg.output_format);
-	if (fmt < 0) {
-		fprintf(stderr, "ERROR : WDC : invalid output format\n");
-		return fmt;
-	}
-
-	if (cfg.interval < 1 || cfg.interval > 15) {
-		fprintf(stderr, "ERROR : WDC : interval out of range [1-15]\n");
-		return -1;
-	}
-
-	if ((data = (__u8*) malloc(sizeof (__u8) * WDC_ADD_LOG_BUF_LEN)) == NULL) {
-		fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
-		return -1;
-	}
-	memset(data, 0, sizeof (__u8) * WDC_ADD_LOG_BUF_LEN);
-
-	ret = nvme_get_log(fd, 0x01, WDC_NVME_ADD_LOG_OPCODE, WDC_ADD_LOG_BUF_LEN, data);
-	if (strcmp(cfg.output_format, "json"))
-		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
-	if (ret == 0) {
-		l = (struct wdc_log_page_header*)data;
-		total_subpages = l->num_subpages + WDC_NVME_GET_STAT_PERF_INTERVAL_LIFETIME - 1;
-		for (i = 0, p = data + skip_cnt; i < total_subpages; i++, p += skip_cnt) {
-			sph = (struct wdc_log_page_subpage_header *) p;
-			if (sph->spcode == WDC_GET_LOG_PAGE_SSD_PERFORMANCE) {
-				if (sph->pcset == cfg.interval) {
-					perf = (struct wdc_ssd_perf_stats *) (p + 4);
-					ret = wdc_print_log(perf, fmt);
-					break;
-				}
-			}
-			skip_cnt = le32_to_cpu(sph->subpage_length) + 4;
-		}
-		if (ret) {
-			fprintf(stderr, "ERROR : WDC : Unable to read data from buffer\n");
-		}
-	}
-	free(data);
-	return ret;
-}
-
-
 static int wdc_get_ca_log_page(int fd, char *format)
 {
 	int ret = 0;
@@ -2133,10 +2094,8 @@ static int wdc_get_ca_log_page(int fd, char *format)
 	}
 
 	/* verify the 0xCA log page is supported */
-	if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE)) {
-		fprintf(stderr, "ERROR : WDC : 0xCA Log Page not supported\n");
+	if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE) == false)
 		return -1;
-	}
 
 	if ((data = (__u8*) malloc(sizeof (__u8) * WDC_CA_LOG_BUF_LEN)) == NULL) {
 		fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
@@ -2235,10 +2194,8 @@ static int wdc_get_d0_log_page(int fd, char *format)
 	}
 
 	/* verify the 0xD0 log page is supported */
-	if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_VU_SMART_LOG_OPCODE)) {
-		fprintf(stderr, "ERROR : WDC : 0xD0 Log Page not supported\n");
+	if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_VU_SMART_LOG_OPCODE) == false)
 		return -1;
-	}
 
 	if ((data = (__u8*) malloc(sizeof (__u8) * WDC_NVME_VU_SMART_LOG_LEN)) == NULL) {
 		fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
@@ -2264,6 +2221,50 @@ static int wdc_get_d0_log_page(int fd, char *format)
 	return ret;
 }
 
+static int wdc_smart_add_log_c1(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	char *desc = "Retrieve additional performance statistics.";
+	char *interval = "Interval to read the statistics from [1, 15].";
+	int fd;
+	int ret;
+
+	struct config {
+		uint8_t interval;
+		int vendor_specific;
+		char *output_format;
+	};
+
+	struct config cfg = {
+		.interval = 14,
+		.output_format = "normal",
+	};
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"interval", 'i', "NUM", CFG_POSITIVE, &cfg.interval, required_argument, interval},
+		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format, required_argument, "Output Format: normal|json" },
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
+	if (wdc_check_device_match(fd, WDC_NVME_VID, WDC_NVME_SN100_DEV_ID) ||
+		wdc_check_device_match(fd, WDC_NVME_VID, WDC_NVME_SN200_DEV_ID)	) {
+		// Get the C1 Log Page
+		ret = wdc_get_c1_log_page(fd, cfg.output_format, cfg.interval);
+
+		if (ret) {
+			fprintf(stderr, "ERROR : WDC : Unable to read C1 Log Page data from buffer\n");
+			return ret;
+		}
+	} else {
+		fprintf(stderr, "INFO : WDC : Command not supported in this device\n");
+	}
+
+	return 0;
+}
 
 static int wdc_smart_add_log(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
@@ -2399,12 +2400,19 @@ static int wdc_drive_status(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	char *desc = "Get Drive Status.";
-	//struct wdc_ssd_c0_eol_log *log_page;
-	struct nvme_smart_log *log_page;
+	char *thermal_status_str;
+	char *assert_status_str;
+	char status_str[16];
+	struct nvme_smart_log *smart_log_page;
 	int log_page_length;
 	__u8 *data;
 	int fd;
 	int ret = -1;
+	uint32_t		percent_remaining;
+	__u32 assert_status = 0xFFFFFFFF, thermal_status = 0xFFFFFFFF;
+
+	assert_status_str = status_str;
+	thermal_status_str = status_str;
 
 	const struct argconfig_commandline_options command_line_options[] = {
 		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
@@ -2420,10 +2428,8 @@ static int wdc_drive_status(int argc, char **argv, struct command *command,
 #if 0 	/* Don't use the 0xC0 log page until updated EOL status is added */
 		/* verify the 0xC0 log page is supported */
 		log_page_length = sizeof(__u8) * WDC_NVME_EOL_STATUS_LOG_LEN);
-		 if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_EOL_STATUS_LOG_OPCODE)) {
-		 	fprintf(stderr, "ERROR : WDC : 0xC0 Log Page not supported\n");
+		 if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_EOL_STATUS_LOG_OPCODE) == false)
 			return -1;
-		}
 
 		if ((data = (__u8 *) malloc(log_page_length)) == NULL) {
 			fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
@@ -2437,10 +2443,8 @@ static int wdc_drive_status(int argc, char **argv, struct command *command,
 
 		/* verify the 0x02 smart log page is supported */
 		log_page_length = sizeof(struct nvme_smart_log);
-		if (wdc_nvme_check_supported_log_page(fd, NVME_LOG_SMART)) {
-			fprintf(stderr, "ERROR : WDC : 0x%x Log Page not supported\n", NVME_LOG_SMART);
+		if (wdc_nvme_check_supported_log_page(fd, NVME_LOG_SMART) == false)
 			return -1;
-		}
 
 		if ((data = (__u8 *) malloc(log_page_length)) == NULL) {
 			fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
@@ -2448,26 +2452,135 @@ static int wdc_drive_status(int argc, char **argv, struct command *command,
 		}
 		memset(data, 0, log_page_length);
 
-
 		ret = nvme_get_log(fd, 0xFFFFFFFF, NVME_LOG_SMART,
 				log_page_length, data);
 
 		if (ret == 0) {
 			/* parse the data */
 #if 0 	/* Don't use the 0xC0 log page until updated EOL status is added */
-			log_page = (struct wdc_ssd_c0_eol_log *)(data);
-			ret = wdc_print_drive_status(log_page);
+			smart_log_page = (struct wdc_ssd_c0_eol_log *)(data);
+			ret = wdc_print_drive_status(smart_log_page);
 #endif
-			log_page = (struct nvme_smart_log *)(data);
-			ret = wdc_print_drive_status(log_page);
+			smart_log_page = (struct nvme_smart_log *)(data);
+			//ret = wdc_print_drive_status(smart_log_page);
 		} else {
 			fprintf(stderr, "ERROR : WDC : Unable to read 0x%x Log Page data\n", NVME_LOG_SMART);
 			ret = -1;
+			goto end;
 		}
 
 		free(data);
+
+		/* verify the 0xC2 Device Manageability log page is supported */
+		log_page_length = sizeof(struct nvme_smart_log);
+		if (wdc_nvme_check_supported_log_page(fd, NVME_LOG_SMART) == false)
+			return -1;
+
+		if ((data = (__u8 *) malloc(log_page_length)) == NULL) {
+			fprintf(stderr, "ERROR : WDC : malloc : %s\n", strerror(errno));
+			return -1;
+		}
+		memset(data, 0, log_page_length);
+
+		ret = nvme_get_log(fd, 0xFFFFFFFF, NVME_LOG_SMART,
+				log_page_length, data);
+
+		/* Get the assert dump present status */
+		if (wdc_nvme_get_assert_status(fd, (__u32 *)&assert_status) == false)
+			fprintf(stderr, "ERROR : WDC : Get Assert Status Failed\n");
+
+		/* Get the thermal throttling status */
+		if (wdc_nvme_get_thermal_throttling_status(fd, (__u32 *)&thermal_status) == false)
+			fprintf(stderr, "ERROR : WDC : Get Thermal Throttling Status Failed\n");
+
+		/* Print out the drive status */
+		if (!smart_log_page) {
+			fprintf(stderr, "ERROR : WDC : Invalid buffer to read Smart Log Data\n");
+			ret = -1;
+			goto end;
+		}
+
+		percent_remaining = le32_to_cpu(100 - smart_log_page->percent_used);
+
+		printf("  Drive Status :- \n");
+		printf("  Percent Life Remaining: 		%2"PRIu32"%%\n", percent_remaining);
+
+		if (percent_remaining == 0)
+			printf("  EOL Status:		  		End Of Life\n");
+		else if (smart_log_page->critical_warning & NVME_SMART_CRIT_MEDIA)
+			printf("  EOL Status:				Read Only\n");
+		else
+			printf("  EOL Status:				Normal\n");
+
+		if (assert_status == ASSERT_DUMP_PRESENT)
+			assert_status_str = "Present ";
+		else if (assert_status == ASSERT_DUMP_NOT_PRESENT)
+			assert_status_str = "Not Present ";
+		else
+			assert_status_str = "Unknown ";
+
+		printf("  Assert Dump Status:			%s: 0x%08x\n",
+				assert_status_str, le32_to_cpu(assert_status));
+
+		if (thermal_status == THERMAL_THROTTLING_OFF)
+			thermal_status_str = "Off ";
+		else if (thermal_status == THERMAL_THROTTLING_ON)
+			thermal_status_str = "On ";
+		else if (thermal_status == THERMAL_THROTTLING_UNAVAILABLE)
+			thermal_status_str = "Unavailable ";
+		else
+			thermal_status_str = "Unknown ";
+
+		printf("  Thermal Throttling Status:		%s: 0x%08x\n",
+				thermal_status_str, le32_to_cpu(thermal_status));
+
 	}
 	else {
+		fprintf(stderr, "INFO : WDC : Command not supported in this device\n");
+	}
+
+end:
+	return ret;
+}
+
+static int wdc_clear_assert_dump(int argc, char **argv, struct command *command,
+		struct plugin *plugin)
+{
+	char *desc = "Clear Assert Dump Present Status.";
+	int fd;
+	int ret = -1;
+	__u32 assert_status = 0xFFFFFFFF;
+	struct nvme_passthru_cmd admin_cmd;
+	const struct argconfig_commandline_options command_line_options[] = {
+		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options, NULL, 0);
+	if (fd < 0)
+		return fd;
+
+	if (wdc_check_device_match(fd, WDC_NVME_VID_2, WDC_NVME_SN310_DEV_ID) ||
+		wdc_check_device_match(fd, WDC_NVME_VID_2, WDC_NVME_SN510_DEV_ID)) {
+
+		/* Get the assert dump present status */
+		if (wdc_nvme_get_assert_status(fd, (__u32 *)&assert_status) == false) {
+			fprintf(stderr, "ERROR : WDC : Get Assert Status Failed\n");
+			return -1;
+		}
+
+		if (assert_status == ASSERT_DUMP_PRESENT) {
+			memset(&admin_cmd, 0, sizeof (admin_cmd));
+			admin_cmd.opcode = WDC_NVME_CLEAR_ASSERT_DUMP_OPCODE;
+			admin_cmd.cdw12 = ((WDC_NVME_CLEAR_ASSERT_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
+					WDC_NVME_CLEAR_ASSERT_DUMP_CMD);
+
+			ret = nvme_submit_passthru(fd, NVME_IOCTL_ADMIN_CMD, &admin_cmd);
+			fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
+		} else {
+			fprintf(stderr, "INFO : WDC : No Assert Dump Present\n");
+		}
+	} else {
 		fprintf(stderr, "INFO : WDC : Command not supported in this device\n");
 	}
 
