@@ -33,7 +33,13 @@ Output Explanation
 |The percentage of drive function remaining               
 
 |*EOL (End of Life) Status*
-|The 3 possible states are :  Normal, Read Only, and End of Life.
+|The 3 possible states are :  Normal, Read Only, or End of Life.
+
+|*Assert Dump Status*
+|The 3 possible states are :  Present, Not Present, or Unknown.
+
+|*Thermal Throttling Status*
+|The 4 possible states are :  Off, On, Unavaiable, or Unknown.
 
 |===
 
