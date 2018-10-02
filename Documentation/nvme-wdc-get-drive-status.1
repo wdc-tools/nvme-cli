@@ -2,12 +2,12 @@
 .\"     Title: nvme-wdc-get-drive-status
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 09/04/2018
+.\"      Date: 10/01/2018
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-GET\-DRIV" "1" "09/04/2018" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-GET\-DRIV" "1" "10/01/2018" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -32,7 +32,7 @@ nvme-wdc-get-drive-status \- Send the NVMe WDC get\-drive\-status command, retur
 .SH "SYNOPSIS"
 .sp
 .nf
-\fInvme wdc get\-drive\-status\fR <device> [\-\-output\-format=<normal|json> \-o <normal|json>]
+\fInvme wdc get\-drive\-status\fR <device>
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -43,14 +43,6 @@ The <device> parameter is mandatory and may be either the NVMe character device 
 This will only work on WDC devices supporting this feature\&. Results for any other device are undefined\&.
 .sp
 On success it returns 0, error code otherwise\&.
-.SH "OPTIONS"
-.PP
-\-o <format>, \-\-output\-format=<format>
-.RS 4
-Set the reporting format to
-\fIhuman\fR, or
-\fIjson\fR\&. Only one output format can be used at a time\&. Default is human\&.
-.RE
 .SH "OUTPUT EXPLANATION"
 .TS
 allbox tab(:);
@@ -61,6 +53,8 @@ T}:T{
 Description
 T}
 .T&
+lt lt
+lt lt
 lt lt
 lt lt.
 T{
@@ -75,7 +69,21 @@ T{
 \fBEOL (End of Life) Status\fR
 T}:T{
 .sp
-The 3 possible states are : Normal, Read Only, and End of Life\&.
+The 3 possible states are : Normal, Read Only, or End of Life\&.
+T}
+T{
+.sp
+\fBAssert Dump Status\fR
+T}:T{
+.sp
+The 3 possible states are : Present, Not Present, or Unknown\&.
+T}
+T{
+.sp
+\fBThermal Throttling Status\fR
+T}:T{
+.sp
+The 4 possible states are : Off, On, Unavaiable, or Unknown\&.
 T}
 .TE
 .sp 1
