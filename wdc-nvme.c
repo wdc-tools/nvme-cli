@@ -345,8 +345,8 @@ static int wdc_purge(int argc, char **argv,
 static int wdc_purge_monitor(int argc, char **argv,
 		struct command *command, struct plugin *plugin);
 static bool wdc_nvme_check_supported_log_page(int fd, __u8 log_id);
-static int wdc_clear_pcie_corr(int argc, char **argv, struct command *command,
-		struct plugin *plugin);
+static int wdc_clear_pcie_correctable_errors(int argc, char **argv, 
+		struct command *command, struct plugin *plugin);
 static int wdc_do_drive_essentials(int fd, char *dir, char *key);
 static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 		struct plugin *plugin);
@@ -2221,7 +2221,7 @@ static int wdc_get_d0_log_page(int fd, char *format)
 	return ret;
 }
 
-static int wdc_smart_add_log_c1(int argc, char **argv, struct command *command,
+static int wdc_vs_smart_add_log_c1(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	char *desc = "Retrieve additional performance statistics.";
@@ -2266,7 +2266,7 @@ static int wdc_smart_add_log_c1(int argc, char **argv, struct command *command,
 	return 0;
 }
 
-static int wdc_smart_add_log(int argc, char **argv, struct command *command,
+static int wdc_vs_smart_add_log(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	const char *desc = "Retrieve additional performance statistics.";
@@ -2326,7 +2326,7 @@ static int wdc_smart_add_log(int argc, char **argv, struct command *command,
 	return 0;
 }
 
-static int wdc_smart_add_log_d0(int argc, char **argv, struct command *command,
+static int wdc_vs_smart_add_log_d0(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	const char *desc = "Retrieve additional performance statistics.";
@@ -2368,8 +2368,8 @@ static int wdc_smart_add_log_d0(int argc, char **argv, struct command *command,
 	return 0;
 }
 
-static int wdc_clear_pcie_corr(int argc, char **argv, struct command *command,
-		struct plugin *plugin)
+static int wdc_clear_pcie_correctable_errors(int argc, char **argv,
+		struct command *command, struct plugin *plugin)
 {
 	char *desc = "Clear PCIE Correctable Errors.";
 	int fd;
