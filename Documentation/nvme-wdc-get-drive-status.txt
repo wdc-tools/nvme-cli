@@ -29,17 +29,20 @@ Output Explanation
 |===
 |Field |Description
 
-|*Percent Life Remaining.*
-|The percentage of drive function remaining               
+|*Percent Life Used.*
+|The percentage of drive function used.                 
 
 |*EOL (End of Life) Status*
 |The 3 possible states are :  Normal, Read Only, or End of Life.
 
 |*Assert Dump Status*
-|The 3 possible states are :  Present, Not Present, or Unknown.
+|The 2 possible states are :  Present or Not Present.
 
 |*Thermal Throttling Status*
-|The 4 possible states are :  Off, On, Unavaiable, or Unknown.
+|The 3 possible states are :  Off, On, or Unavaiable.
+
+|*Format Corrupt Reason*
+|The 3 possible states are :  Not Corrupted, Corrupt due to FW Assert, or Corrupt for Unknown Reason.
 
 |===
 

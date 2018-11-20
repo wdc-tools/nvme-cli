@@ -2,12 +2,12 @@
 .\"     Title: nvme-wdc-get-drive-status
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 10/01/2018
+.\"      Date: 11/20/2018
 .\"    Manual: NVMe Manual
 .\"    Source: NVMe
 .\"  Language: English
 .\"
-.TH "NVME\-WDC\-GET\-DRIV" "1" "10/01/2018" "NVMe" "NVMe Manual"
+.TH "NVME\-WDC\-GET\-DRIV" "1" "11/20/2018" "NVMe" "NVMe Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -56,13 +56,14 @@ T}
 lt lt
 lt lt
 lt lt
+lt lt
 lt lt.
 T{
 .sp
-\fBPercent Life Remaining\&.\fR
+\fBPercent Life Used\&.\fR
 T}:T{
 .sp
-The percentage of drive function remaining
+The percentage of drive function used\&.
 T}
 T{
 .sp
@@ -76,14 +77,21 @@ T{
 \fBAssert Dump Status\fR
 T}:T{
 .sp
-The 3 possible states are : Present, Not Present, or Unknown\&.
+The 2 possible states are : Present or Not Present\&.
 T}
 T{
 .sp
 \fBThermal Throttling Status\fR
 T}:T{
 .sp
-The 4 possible states are : Off, On, Unavaiable, or Unknown\&.
+The 3 possible states are : Off, On, or Unavaiable\&.
+T}
+T{
+.sp
+\fBFormat Corrupt Reason\fR
+T}:T{
+.sp
+The 3 possible states are : Not Corrupted, Corrupt due to FW Assert, or Corrupt for Unknown Reason\&.
 T}
 .TE
 .sp 1
