@@ -152,14 +152,21 @@
 #define WDC_C2_LOG_PAGES_SUPPORTED_ID				0x08
 #define WDC_C2_THERMAL_THROTTLE_STATUS_ID			0x18
 #define WDC_C2_ASSERT_DUMP_PRESENT_ID				0x19
-#define WDC_C2_USER_EOL_STATUS_ID				0x1A
-#define WDC_C2_USER_EOL_STATE_ID				0x1C
-#define WDC_C2_SYSTEM_EOL_STATE_ID				0x1D
-#define ASSERT_DUMP_NOT_PRESENT      				0x00000000
-#define ASSERT_DUMP_PRESENT             			0x00000001
-#define THERMAL_THROTTLING_OFF        				0x00000000
-#define THERMAL_THROTTLING_ON           			0x00000001
-#define THERMAL_THROTTLING_UNAVAILABLE				0x00000002
+#define WDC_C2_USER_EOL_STATUS_ID     				0x1A
+#define WDC_C2_USER_EOL_STATE_ID      				0x1C
+#define WDC_C2_SYSTEM_EOL_STATE_ID     	    		0x1D
+#define WDC_C2_FORMAT_CORRUPT_REASON_ID  			0x1E
+#define WDC_EOL_STATUS_NORMAL                  		0x00000000
+#define WDC_EOL_STATUS_END_OF_LIFE             		0x00000001
+#define WDC_EOL_STATUS_READ_ONLY               		0x00000002
+#define WDC_ASSERT_DUMP_NOT_PRESENT      			0x00000000
+#define WDC_ASSERT_DUMP_PRESENT            			0x00000001
+#define WDC_THERMAL_THROTTLING_OFF        			0x00000000
+#define WDC_THERMAL_THROTTLING_ON          			0x00000001
+#define WDC_THERMAL_THROTTLING_UNAVAILABLE			0x00000002
+#define WDC_FORMAT_NOT_CORRUPT			 	        0x00000000
+#define WDC_FORMAT_CORRUPT_FW_ASSERT	 			0x00000001
+#define WDC_FORMAT_CORRUPT_UNKNOWN       			0x000000FF
 
 /* CA Log Page */
 #define WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE			0xCA
@@ -2386,18 +2393,13 @@ static int wdc_drive_status(int argc, char **argv, struct command *command,
 		struct plugin *plugin)
 {
 	char *desc = "Get Drive Status.";
-	char *thermal_status_str;
-	char *assert_status_str;
-	char status_str[16];
 	int fd;
 	int ret = -1;
 	uint32_t system_eol_state;
 	uint32_t user_eol_state;
+	uint32_t format_corrupt_reason = 0xFFFFFFFF;
 	int32_t eol_status;
 	__u32 assert_status = 0xFFFFFFFF, thermal_status = 0xFFFFFFFF;
-
-	assert_status_str = status_str;
-	thermal_status_str = status_str;
 
 	const struct argconfig_commandline_options command_line_options[] = {
 		{ NULL, '\0', NULL, CFG_NONE, NULL, no_argument, desc },
@@ -2442,6 +2444,11 @@ static int wdc_drive_status(int argc, char **argv, struct command *command,
 				WDC_C2_SYSTEM_EOL_STATE_ID))
 			fprintf(stderr, "ERROR : WDC : Get System EOL State Failed\n");
 
+		/* Get format corrupt reason*/
+		if (!wdc_nvme_get_dev_status_log_data(fd, (__u32 *)&format_corrupt_reason,
+				WDC_C2_FORMAT_CORRUPT_REASON_ID))
+			fprintf(stderr, "ERROR : WDC : Get Format Corrupt Reason Failed\n");
+
 		printf("  Drive Status :- \n");
 		if (eol_status >= 0) {
 			printf("  Percent Used:				%"PRIu32"%%\n",
@@ -2449,45 +2456,40 @@ static int wdc_drive_status(int argc, char **argv, struct command *command,
 		}
 		else
 			printf("  Percent Used:				Unknown\n");
-		if (system_eol_state == 0 && user_eol_state == 0)
+		if (system_eol_state == WDC_EOL_STATUS_NORMAL && user_eol_state == WDC_EOL_STATUS_NORMAL)
 			printf("  Drive Life Status:			Normal\n");
-		else if (system_eol_state == 1 && user_eol_state == 1)
+		else if (system_eol_state == WDC_EOL_STATUS_END_OF_LIFE || user_eol_state == WDC_EOL_STATUS_END_OF_LIFE)
 			printf("  Drive Life Status:	  		End Of Life\n");
-		else if (system_eol_state == 1)
-			printf("  Drive Life Status:			System Area End of Life\n");
-		else if (user_eol_state == 1)
-			printf("  Drive Life Status:			User Area End of Life\n");
-		else if (system_eol_state == 2 && user_eol_state == 2)
+		else if (system_eol_state == WDC_EOL_STATUS_READ_ONLY || user_eol_state == WDC_EOL_STATUS_READ_ONLY)
 			printf("  Drive Life Status:	  		Read Only\n");
-		else if (system_eol_state == 2)
-			printf("  Drive Life Status:			System Area Read Only\n");
-		else if (user_eol_state == 2)
-			printf("  Drive Life Status:			User Area Read Only\n");
 		else
-			printf("  Drive Life Status:			Unavailable\n");
+			printf("  Drive Life Status:			Unknown : 0x%08x/0x%08x\n",
+					le32_to_cpu(user_eol_state), le32_to_cpu(system_eol_state));
 
-		if (assert_status == ASSERT_DUMP_PRESENT)
-			assert_status_str = "Present ";
-		else if (assert_status == ASSERT_DUMP_NOT_PRESENT)
-			assert_status_str = "Not Present ";
+		if (assert_status == WDC_ASSERT_DUMP_PRESENT)
+			printf("  Assert Dump Status:			Present\n");
+		else if (assert_status == WDC_ASSERT_DUMP_NOT_PRESENT)
+			printf("  Assert Dump Status:			Not Present\n");
 		else
-			assert_status_str = "Unknown ";
+			printf("  Assert Dump Status:			Unknown : 0x%08x\n", le32_to_cpu(assert_status));
 
-		printf("  Assert Dump Status:			%s: 0x%08x\n",
-				assert_status_str, le32_to_cpu(assert_status));
-
-		if (thermal_status == THERMAL_THROTTLING_OFF)
-			thermal_status_str = "Off ";
-		else if (thermal_status == THERMAL_THROTTLING_ON)
-			thermal_status_str = "On ";
-		else if (thermal_status == THERMAL_THROTTLING_UNAVAILABLE)
-			thermal_status_str = "Unavailable ";
+		if (thermal_status == WDC_THERMAL_THROTTLING_OFF)
+			printf("  Thermal Throttling Status:		Off\n");
+		else if (thermal_status == WDC_THERMAL_THROTTLING_ON)
+			printf("  Thermal Throttling Status:		On\n");
+		else if (thermal_status == WDC_THERMAL_THROTTLING_UNAVAILABLE)
+			printf("  Thermal Throttling Status:		Unavailable\n");
 		else
-			thermal_status_str = "Unknown ";
+			printf("  Thermal Throttling Status:		Unknown : 0x%08x\n", le32_to_cpu(thermal_status));
 
-		printf("  Thermal Throttling Status:		%s: 0x%08x\n",
-				thermal_status_str, le32_to_cpu(thermal_status));
-
+		if (format_corrupt_reason == WDC_FORMAT_NOT_CORRUPT)
+			printf("  Format Corrupt Reason:		Format Not Corrupted\n");
+		else if (format_corrupt_reason == WDC_FORMAT_CORRUPT_FW_ASSERT)
+			printf("  Format Corrupt Reason:	        Format Corrupt due to FW Assert\n");
+		else if (format_corrupt_reason == WDC_FORMAT_CORRUPT_UNKNOWN)
+			printf("  Format Corrupt Reason:	        Format Corrupt for Unknown Reason\n");
+		else
+			printf("  Format Corrupt Reason:	        Unknown : 0x%08x\n", le32_to_cpu(format_corrupt_reason));
 	}
 	else {
 		fprintf(stderr, "INFO : WDC : Command not supported in this device\n");
@@ -2523,7 +2525,7 @@ static int wdc_clear_assert_dump(int argc, char **argv, struct command *command,
 			return -1;
 		}
 
-		if (assert_status == ASSERT_DUMP_PRESENT) {
+		if (assert_status == WDC_ASSERT_DUMP_PRESENT) {
 			memset(&admin_cmd, 0, sizeof (admin_cmd));
 			admin_cmd.opcode = WDC_NVME_CLEAR_ASSERT_DUMP_OPCODE;
 			admin_cmd.cdw12 = ((WDC_NVME_CLEAR_ASSERT_DUMP_SUBCMD << WDC_NVME_SUBCMD_SHIFT) |
