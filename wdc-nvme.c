@@ -55,7 +55,6 @@
 #define WDC_NVME_VID  					0x1c58
 #define WDC_NVME_VID_2        			0x1b96
 #define WDC_NVME_SNDK_VID		        0x15b7
-#define WDC_NVME_SN730_VID			0x19e5
 
 #define WDC_NVME_SN100_DEV_ID			0x0003
 #define WDC_NVME_SN200_DEV_ID			0x0023
@@ -81,6 +80,7 @@
 #define WDC_DRIVE_CAP_DRIVE_STATUS		0x0000000000000020
 #define WDC_DRIVE_CAP_CLEAR_ASSERT		0x0000000000000040
 #define WDC_DRIVE_CAP_CLEAR_PCIE		0x0000000000000080
+#define WDC_DRIVE_CAP_RESIZE			0x0000000000000100
 
 #define WDC_DRIVE_CAP_DRIVE_ESSENTIALS 	0x0000000100000000
 #define WDC_DRIVE_CAP_DUI_DATA 	        0x0000000200000000
@@ -716,7 +716,13 @@ static __u64 wdc_get_drive_capabilities(int fd) {
 		case WDC_NVME_SN840_DEV_ID:
 			capabilities = (WDC_DRIVE_CAP_CAP_DIAG | WDC_DRIVE_CAP_INTERNAL_LOG |
 					WDC_DRIVE_CAP_CA_LOG_PAGE | WDC_DRIVE_CAP_D0_LOG_PAGE |
-					WDC_DRIVE_CAP_DRIVE_STATUS | WDC_DRIVE_CAP_CLEAR_ASSERT);
+					WDC_DRIVE_CAP_DRIVE_STATUS | WDC_DRIVE_CAP_CLEAR_ASSERT |
+					WDC_DRIVE_CAP_RESIZE);
+			break;
+		case WDC_NVME_SN730_DEV_ID:
+		/* FALLTHRU */
+		case WDC_NVME_SN730_DEV_ID_1:
+			capabilities = WDC_SN730_CAP_VUC_LOG;
 			break;
 		default:
 			capabilities = 0;
@@ -740,17 +746,6 @@ static __u64 wdc_get_drive_capabilities(int fd) {
 			capabilities = 0;
 		}
 
-		break;
-	case WDC_NVME_SN730_VID:
-		switch (read_device_id) {
-		case WDC_NVME_SN730_DEV_ID:
-		/* FALLTHRU */
-		case WDC_NVME_SN730_DEV_ID_1:
-			capabilities = WDC_SN730_CAP_VUC_LOG;
-			break;
-		default:
-			capabilities = 0;
-		}
 		break;
 	default:
 		capabilities = 0;
@@ -3666,6 +3661,7 @@ static int wdc_drive_resize(int argc, char **argv,
 	const char *size = "The new size (in GB) to resize the drive to.";
 	int fd;
 	int ret;
+	uint64_t capabilities = 0;
 
 	struct config {
 		uint64_t size;
@@ -3685,7 +3681,13 @@ static int wdc_drive_resize(int argc, char **argv,
 		return fd;
 
 	wdc_check_device(fd);
-	ret = wdc_do_drive_resize(fd, cfg.size);
+	capabilities = wdc_get_drive_capabilities(fd);
+	if ((capabilities & WDC_DRIVE_CAP_RESIZE) == WDC_DRIVE_CAP_RESIZE) {
+		ret = wdc_do_drive_resize(fd, cfg.size);
+	} else {
+		fprintf(stderr, "ERROR : WDC: unsupported device for this command\n");
+		ret = -1;
+	}
 	if (!ret)
 		printf("New size: %lu GB\n", cfg.size);
 	fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
