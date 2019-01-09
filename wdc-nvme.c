@@ -86,6 +86,9 @@
 #define WDC_DRIVE_CAP_DUI_DATA 	        0x0000000200000000
 
 #define WDC_SN730_CAP_VUC_LOG			0x0000000400000000
+#define WDC_DRIVE_CAP_SMART_LOG_MASK	(WDC_DRIVE_CAP_C1_LOG_PAGE | WDC_DRIVE_CAP_CA_LOG_PAGE | \
+                                    	 WDC_DRIVE_CAP_D0_LOG_PAGE)
+
 
 /* SN730 Get Log Capabilities */
 #define SN730_NVME_GET_LOG_OPCODE		0xc2
@@ -694,8 +697,15 @@ static __u64 wdc_get_drive_capabilities(int fd) {
 			capabilities = (WDC_DRIVE_CAP_CAP_DIAG | WDC_DRIVE_CAP_INTERNAL_LOG | WDC_DRIVE_CAP_C1_LOG_PAGE);
 			break;
 		case WDC_NVME_SN200_DEV_ID:
-			capabilities = (WDC_DRIVE_CAP_CAP_DIAG | WDC_DRIVE_CAP_INTERNAL_LOG |
-					WDC_DRIVE_CAP_C1_LOG_PAGE | WDC_DRIVE_CAP_CA_LOG_PAGE);
+			capabilities = (WDC_DRIVE_CAP_CAP_DIAG | WDC_DRIVE_CAP_INTERNAL_LOG);
+
+			/* verify the 0xCA log page is supported */
+			if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE) == true)
+				capabilities |= WDC_DRIVE_CAP_CA_LOG_PAGE;
+
+			/* verify the 0xC1 log page is supported */
+			if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_ADD_LOG_OPCODE) == true)
+				capabilities |= WDC_DRIVE_CAP_C1_LOG_PAGE;
 			break;
 		default:
 			capabilities = 0;
@@ -716,10 +726,16 @@ static __u64 wdc_get_drive_capabilities(int fd) {
 		/* FALLTHRU */
 		case WDC_NVME_SN840_DEV_ID:
 			capabilities = (WDC_DRIVE_CAP_CAP_DIAG | WDC_DRIVE_CAP_INTERNAL_LOG |
-					WDC_DRIVE_CAP_CA_LOG_PAGE | WDC_DRIVE_CAP_D0_LOG_PAGE |
 					WDC_DRIVE_CAP_DRIVE_STATUS | WDC_DRIVE_CAP_CLEAR_ASSERT |
 					WDC_DRIVE_CAP_RESIZE);
 
+			/* verify the 0xCA log page is supported */
+			if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE) == true)
+				capabilities |= WDC_DRIVE_CAP_CA_LOG_PAGE;
+
+			/* verify the 0xD0 log page is supported */
+			if (wdc_nvme_check_supported_log_page(fd, WDC_NVME_GET_VU_SMART_LOG_OPCODE) == true)
+				capabilities |= WDC_DRIVE_CAP_D0_LOG_PAGE;
 			break;
 		case WDC_NVME_SN730_DEV_ID:
 		/* FALLTHRU */
@@ -915,17 +931,19 @@ static bool wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
 				}
 			}
 
+#ifdef WDC_NVME_CLI_DEBUG
 			if (!found) {
 				fprintf(stderr, "ERROR : WDC : Log Page 0x%x not supported\n", log_id);
 				fprintf(stderr, "WDC : Supported Log Pages:\n");
 				/* print the supported pages */
 				d((__u8 *)cbs_data->data, cbs_data->length, 16, 1);
 			}
+#endif
 		} else {
 			fprintf(stderr, "ERROR : WDC : cbs_data ptr = NULL\n");
 		}
 	} else {
-		fprintf(stderr, "ERROR : WDC : Entry ID 0x%x not found\n", WDC_C2_LOG_PAGES_SUPPORTED_ID);
+		fprintf(stderr, "ERROR : WDC : 0xC2 Log Page entry ID 0x%x not found\n", WDC_C2_LOG_PAGES_SUPPORTED_ID);
 	}
 
 	return found;
@@ -2640,43 +2658,34 @@ static int wdc_vs_smart_add_log(int argc, char **argv, struct command *command,
 		return fd;
 
 	capabilities = wdc_get_drive_capabilities(fd);
-	if ((capabilities & (WDC_DRIVE_CAP_CA_LOG_PAGE | WDC_DRIVE_CAP_C1_LOG_PAGE)) ==
-			(WDC_DRIVE_CAP_CA_LOG_PAGE | WDC_DRIVE_CAP_C1_LOG_PAGE)) {
-		// Get the CA and C1 Log Page
-		ret = wdc_get_ca_log_page(fd, cfg.output_format);
-		if (ret) {
-			fprintf(stderr, "ERROR : WDC : Unable to read CA Log Page\n");
-			return ret;
-		}
 
-		ret = wdc_get_c1_log_page(fd, cfg.output_format, cfg.interval);
-		if (ret) {
-			fprintf(stderr, "ERROR : WDC : Unable to read C1 Log Page\n");
-			return ret;
-		}
+	if ((capabilities & WDC_DRIVE_CAP_SMART_LOG_MASK) == 0) {
+		fprintf(stderr, "ERROR : WDC: unsupported device for this command\n");
+		return 0;
 	}
-	else if ((capabilities & (WDC_DRIVE_CAP_CA_LOG_PAGE | WDC_DRIVE_CAP_C1_LOG_PAGE)) ==
-			WDC_DRIVE_CAP_CA_LOG_PAGE) {
+
+	if ((capabilities & WDC_DRIVE_CAP_CA_LOG_PAGE) == WDC_DRIVE_CAP_CA_LOG_PAGE) {
 		// Get the CA Log Page
 		ret = wdc_get_ca_log_page(fd, cfg.output_format);
-		if (ret) {
-			fprintf(stderr, "ERROR : WDC : Unable to read CA Log Page\n");
-			return ret;
-		}
+		if (ret)
+			fprintf(stderr, "ERROR : WDC : Failure reading the CA Log Page, ret = %d\n", ret);
 	}
-	else if ((capabilities & (WDC_DRIVE_CAP_CA_LOG_PAGE | WDC_DRIVE_CAP_C1_LOG_PAGE)) ==
-			WDC_DRIVE_CAP_C1_LOG_PAGE) {
+
+	if ((capabilities & WDC_DRIVE_CAP_C1_LOG_PAGE) == WDC_DRIVE_CAP_C1_LOG_PAGE) {
 		// Get the C1 Log Page
 		ret = wdc_get_c1_log_page(fd, cfg.output_format, cfg.interval);
 
-		if (ret) {
-			fprintf(stderr, "ERROR : WDC : Unable to read C1 Log Page\n");
-			return ret;
-		}
+		if (ret)
+			fprintf(stderr, "ERROR : WDC : Failure reading the C1 Log Page, ret = %d\n", ret);
 	}
-	else {
-		fprintf(stderr, "ERROR : WDC: unsupported device for this command\n");
 
+
+	if ((capabilities & WDC_DRIVE_CAP_D0_LOG_PAGE) == WDC_DRIVE_CAP_D0_LOG_PAGE) {
+		// Get the D0 Log Page
+		ret = wdc_get_d0_log_page(fd, cfg.output_format);
+
+		if (ret)
+			fprintf(stderr, "ERROR : WDC : Failure reading the D0 Log Page, ret = %d\n", ret);
 	}
 
 	return 0;
