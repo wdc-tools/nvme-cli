@@ -700,6 +700,7 @@ static __u64 wdc_get_drive_capabilities(int fd) {
 		default:
 			capabilities = 0;
 		}
+
 		break;
 	case WDC_NVME_VID_2:
 		switch (read_device_id) {
@@ -718,6 +719,7 @@ static __u64 wdc_get_drive_capabilities(int fd) {
 					WDC_DRIVE_CAP_CA_LOG_PAGE | WDC_DRIVE_CAP_D0_LOG_PAGE |
 					WDC_DRIVE_CAP_DRIVE_STATUS | WDC_DRIVE_CAP_CLEAR_ASSERT |
 					WDC_DRIVE_CAP_RESIZE);
+
 			break;
 		case WDC_NVME_SN730_DEV_ID:
 		/* FALLTHRU */
@@ -727,6 +729,7 @@ static __u64 wdc_get_drive_capabilities(int fd) {
 		default:
 			capabilities = 0;
 		}
+
 		break;
 	case WDC_NVME_SNDK_VID:
 		switch (read_device_id) {
@@ -1631,18 +1634,23 @@ static int wdc_internal_fw_log(int argc, char **argv, struct command *command,
 			return -1;
 		}
 	}
-	fprintf(stderr, "%s: filename = %s\n", __func__, f);
 
 	capabilities = wdc_get_drive_capabilities(fd);
-	if ((capabilities & WDC_DRIVE_CAP_INTERNAL_LOG) == WDC_DRIVE_CAP_INTERNAL_LOG) {
-		snprintf(f + strlen(f), PATH_MAX, "%s", ".bin");
+	if (((capabilities & WDC_DRIVE_CAP_INTERNAL_LOG) == WDC_DRIVE_CAP_INTERNAL_LOG) ||
+		((capabilities & WDC_DRIVE_CAP_DUI_DATA) == WDC_DRIVE_CAP_DUI_DATA)) {
+		if (cfg.file == NULL)
+			snprintf(f + strlen(f), PATH_MAX, "%s", ".bin");
+	}
+
+	fprintf(stderr, "%s: filename = %s\n", __func__, f);
+
+	if ((capabilities & WDC_DRIVE_CAP_INTERNAL_LOG) == WDC_DRIVE_CAP_INTERNAL_LOG)
 		return wdc_do_cap_diag(fd, f, xfer_size);
-	} else if ((capabilities & WDC_DRIVE_CAP_DUI_DATA) == WDC_DRIVE_CAP_DUI_DATA) {
-		snprintf(f + strlen(f), PATH_MAX, "%s", ".bin");
+	else if ((capabilities & WDC_DRIVE_CAP_DUI_DATA) == WDC_DRIVE_CAP_DUI_DATA)
 		return wdc_do_cap_dui(fd, f, xfer_size);
-	} else if ((capabilities & WDC_SN730_CAP_VUC_LOG) == WDC_SN730_CAP_VUC_LOG) {
+	else if ((capabilities & WDC_SN730_CAP_VUC_LOG) == WDC_SN730_CAP_VUC_LOG)
 		return wdc_do_sn730_get_and_tar(fd, f);
-	} else {
+	else {
 		fprintf(stderr, "ERROR : WDC: unsupported device for this command\n");
 		return -1;
 	}
