@@ -64,8 +64,8 @@ typedef struct _UtilsTimeInfo
 	unsigned int minute;
 	unsigned int second;
 	unsigned int msecs;
-	unsigned char isDST; //0 or 1
-    int      zone; // Zone value like +530 or -300
+	unsigned char isDST; /*0 or 1 */
+    int      zone; /* Zone value like +530 or -300 */
 } UtilsTimeInfo, *PUtilsTimeInfo;
 
 int wdc_UtilsSnprintf(char *buffer, unsigned int sizeOfBuffer, const char *format, ...);
@@ -74,8 +74,5 @@ int wdc_UtilsGetTime(PUtilsTimeInfo timeInfo);
 int wdc_UtilsStrCompare(char *pcSrc, char *pcDst);
 int wdc_UtilsCreateDir(char *path);
 int wdc_WriteToFile(char *fileName, char *buffer, unsigned int bufferLen);
-
-extern char *tzname[2];
-extern long timezone;
-extern int daylight;
+void wdc_StrFormat(char *formatter, size_t fmt_sz, char *tofmt, size_t tofmtsz);
 
